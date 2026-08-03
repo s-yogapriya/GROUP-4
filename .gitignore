@@ -1,0 +1,11 @@
+# Root gitignore
+
+# Logs
+*.log
+hs_err_pid*.log
+
+# IDE & OS Files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
