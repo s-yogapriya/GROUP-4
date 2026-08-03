@@ -1,4 +1,4 @@
-# Maven
+# Maven build output
 target/
 *.class
 *.jar
@@ -8,14 +8,19 @@ target/
 # Spring Boot
 spring-boot-*.jar
 
-# IntelliJ IDEA / IDE
+# Eclipse / STS
+.classpath
+.project
+.settings/
+.factorypath
+.sts4-cache/
+
+# IntelliJ IDEA / Visual Studio Code / IDEs
 .idea/
 *.iml
 *.iws
 *.ipr
-.classpath
-.project
-.settings/
+.vscode/
 
 # Environment & Config
 .env
@@ -26,7 +31,13 @@ application-prod.properties
 # Logs
 logs/
 *.log
+hs_err_pid*.log
 
 # OS Files
 .DS_Store
 Thumbs.db
+
+# File Uploads & Temporary Data
+uploads/
+temp/
+tmp/
