@@ -19,26 +19,21 @@ public class Address {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "house_number", nullable = false)
+    @Column(name = "house_number")
     private String houseNumber;
 
-    @Column(nullable = false)
     private String street;
 
-    @Column(nullable = false)
     private String area;
 
     private String landmark;
 
-    @Column(nullable = false)
     private String city;
 
-    @Column(nullable = false)
     private String state;
 
-    @Column(nullable = false)
     private String country;
 
-    @Column(name = "pin_code", nullable = false, length = 10)
+    @Column(name = "pin_code", length = 10)
     private String pinCode;
 }

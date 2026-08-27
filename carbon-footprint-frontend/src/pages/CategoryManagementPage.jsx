@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
@@ -7,7 +7,8 @@ import {
   FolderPlus, Edit3, Trash2, CheckCircle2, XCircle, Search, 
   RefreshCw, Plus, Layers, ToggleLeft, ToggleRight, AlertCircle,
   Car, Zap, Utensils, ShoppingBag, Truck, Flame, Factory, TreePine, 
-  Wind, Plane, Bike, Bus, Train, Trash, Home, Globe, Activity, Grid2X2, List
+  Wind, Plane, Bike, Bus, Train, Trash, Home, Globe, Activity, Grid2X2, List, Target,
+  Upload, ImageIcon
 } from 'lucide-react';
 
 const ICON_OPTIONS = [
@@ -29,6 +30,122 @@ const ICON_OPTIONS = [
   { name: 'Globe', icon: Globe },
   { name: 'Activity', icon: Activity },
 ];
+
+const MAX_BYTES = 5 * 1024 * 1024;
+const ALLOWED_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+const ALLOWED_EXT = ['.jpg', '.jpeg', '.png', '.webp'];
+
+function ImagePicker({ existingUrl, onFileChange, imageError, setImageError }) {
+  const inputRef = useRef(null);
+  const [localPreview, setLocalPreview] = useState(null);
+  const [fileName, setFileName] = useState('');
+
+  const validate = (file) => {
+    if (!file) return 'Please select an image.';
+    const ext = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
+    if (!ALLOWED_EXT.includes(ext) || !ALLOWED_TYPES.includes(file.type.toLowerCase()))
+      return 'Only JPG, JPEG, PNG and WEBP images are allowed.';
+    if (file.size > MAX_BYTES) return 'Image size must be less than 5 MB.';
+    return null;
+  };
+
+  const handleFile = (file) => {
+    const err = validate(file);
+    if (err) { setImageError(err); onFileChange(null); setLocalPreview(null); setFileName(''); return; }
+    setImageError(null);
+    setFileName(file.name);
+    const url = URL.createObjectURL(file);
+    setLocalPreview(url);
+    onFileChange(file);
+  };
+
+  const onInputChange = (e) => { const f = e.target.files?.[0]; if (f) handleFile(f); };
+
+  const onDrop = (e) => {
+    e.preventDefault();
+    const f = e.dataTransfer.files?.[0];
+    if (f) handleFile(f);
+  };
+
+  const previewSrc = localPreview || existingUrl || null;
+  const hasExisting = !!existingUrl && !localPreview;
+
+  return (
+    <div className="space-y-2">
+      <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider">
+        Category Image <span className="text-slate-500 font-normal normal-case">(JPG, PNG, WEBP · max 5 MB)</span>
+      </label>
+
+      <div
+        className="relative overflow-hidden rounded-xl border-2 border-dashed border-slate-600 hover:border-emerald-500/60 transition-colors cursor-pointer"
+        style={{ minHeight: '8rem' }}
+        onClick={() => inputRef.current?.click()}
+        onDrop={onDrop}
+        onDragOver={e => e.preventDefault()}
+      >
+        {previewSrc ? (
+          <>
+            <img
+              src={previewSrc}
+              alt="Category preview"
+              className="w-full h-32 object-cover"
+              onError={() => { if (localPreview) { setLocalPreview(null); } }}
+            />
+            <div className="absolute inset-0 bg-slate-950/50 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+              <Upload className="h-5 w-5 text-white" />
+              <span className="text-sm font-semibold text-white">
+                {hasExisting ? 'Replace Image' : 'Change Image'}
+              </span>
+            </div>
+          </>
+        ) : (
+          <div className="flex flex-col items-center justify-center gap-2 py-6 px-4 text-center">
+            <div className="rounded-full bg-slate-800 p-2.5">
+              <ImageIcon className="h-5 w-5 text-slate-400" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-slate-300">Click or drag to upload</p>
+              <p className="text-[10px] text-slate-500 mt-0.5">JPG, PNG, WEBP up to 5 MB</p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          {fileName && (
+            <span className="text-xs text-emerald-400 truncate">✓ {fileName}</span>
+          )}
+          {hasExisting && !fileName && (
+            <span className="text-xs text-slate-500 truncate">Current image saved</span>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={() => inputRef.current?.click()}
+          className="shrink-0 flex items-center gap-1.5 rounded-lg border border-slate-600 bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-300 hover:bg-slate-700 hover:border-slate-500"
+        >
+          <Upload className="h-3.5 w-3.5" />
+          {previewSrc ? 'Choose Another' : 'Choose Image'}
+        </button>
+      </div>
+
+      {imageError && (
+        <p className="flex items-center gap-1 text-xs text-rose-400">
+          <AlertCircle className="h-3 w-3 shrink-0" />{imageError}
+        </p>
+      )}
+
+      <input
+        ref={inputRef}
+        type="file"
+        accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+        className="hidden"
+        onChange={onInputChange}
+      />
+    </div>
+  );
+}
 
 const CategoryManagementPage = () => {
   const { showToast } = useAuth();
@@ -53,6 +170,8 @@ const CategoryManagementPage = () => {
   });
   const [formErrors, setFormErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
+  const [imageFile, setImageFile] = useState(null);
+  const [imageError, setImageError] = useState(null);
 
   // Delete Confirm Modal
   const [deletingCategory, setDeletingCategory] = useState(null);
@@ -84,8 +203,11 @@ const CategoryManagementPage = () => {
       displayOrder: categories.length + 1,
       status: 'ACTIVE',
       remarks: '',
+      monthlyLimit: '',
     });
     setFormErrors({});
+    setImageFile(null);
+    setImageError(null);
     setIsModalOpen(true);
   };
 
@@ -100,8 +222,11 @@ const CategoryManagementPage = () => {
       displayOrder: cat.displayOrder || 1,
       status: cat.status || 'ACTIVE',
       remarks: cat.remarks || '',
+      monthlyLimit: cat.monthlyLimit != null ? cat.monthlyLimit : '',
     });
     setFormErrors({});
+    setImageFile(null);
+    setImageError(null);
     setIsModalOpen(true);
   };
 
@@ -116,6 +241,12 @@ const CategoryManagementPage = () => {
     if (!formData.status) {
       errors.status = 'Status is mandatory';
     }
+    if (formData.monthlyLimit !== '' && formData.monthlyLimit !== undefined && formData.monthlyLimit !== null) {
+      const limitVal = Number(formData.monthlyLimit);
+      if (isNaN(limitVal) || limitVal <= 0) {
+        errors.monthlyLimit = 'Monthly emission limit must be a positive number';
+      }
+    }
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -123,25 +254,44 @@ const CategoryManagementPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validateForm()) return;
+    if (imageError) return;
     if (editingCategory && !window.confirm(`Update category "${editingCategory.categoryName}"?`)) return;
 
     setSubmitting(true);
     try {
+      const fd = new FormData();
+      fd.append('categoryCode', formData.categoryCode);
+      fd.append('categoryName', formData.categoryName);
+      fd.append('description', formData.description);
+      if (formData.icon) fd.append('icon', formData.icon);
+      if (formData.colorCode) fd.append('colorCode', formData.colorCode);
+      if (formData.displayOrder) fd.append('displayOrder', formData.displayOrder);
+      fd.append('status', formData.status || 'ACTIVE');
+      if (formData.remarks) fd.append('remarks', formData.remarks);
+      if (formData.monthlyLimit !== '' && formData.monthlyLimit !== undefined && formData.monthlyLimit !== null) {
+        fd.append('monthlyLimit', formData.monthlyLimit);
+      }
+      if (imageFile) fd.append('image', imageFile);
+
       if (editingCategory) {
-        const res = await api.put(`/admin/categories/${editingCategory.categoryId}`, formData);
+        const res = await api.put(`/admin/categories/${editingCategory.categoryId}`, fd);
         showToast(res.message || 'Category updated successfully!', 'success');
       } else {
-        const res = await api.post('/admin/categories', formData);
+        const res = await api.post('/admin/categories', fd);
         showToast(res.message || 'Category created successfully!', 'success');
       }
       setIsModalOpen(false);
       fetchCategories();
     } catch (err) {
-      const msg = typeof err === 'string' ? err : (err?.response?.data?.message || 'Operation failed');
+      const msg = typeof err === 'string' ? err : (err?.response?.data?.message || err?.message || 'Operation failed');
       if (msg.includes('Name')) {
         setFormErrors((prev) => ({ ...prev, categoryName: msg }));
       } else if (msg.includes('Code')) {
         setFormErrors((prev) => ({ ...prev, categoryCode: msg }));
+      } else if (msg.toLowerCase().includes('limit')) {
+        setFormErrors((prev) => ({ ...prev, monthlyLimit: msg }));
+      } else if (msg.toLowerCase().includes('image')) {
+        setImageError(msg);
       } else {
         showToast(msg, 'error');
       }
@@ -310,13 +460,19 @@ const CategoryManagementPage = () => {
               {filteredCategories.map((cat) => (
                 <article key={cat.categoryId} className="group relative overflow-hidden rounded-2xl border border-slate-700 bg-slate-900/70 transition hover:-translate-y-0.5 hover:border-emerald-500/50 hover:shadow-xl hover:shadow-emerald-950/20">
                   <div className="relative h-36 overflow-hidden">
-                    <img src={getCategoryImage(cat)} alt={`${cat.categoryName} sustainability`} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
+                    <img src={cat.image || getCategoryImage(cat)} alt={`${cat.categoryName} sustainability`} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
                     <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/25 to-slate-950/10" />
                     <span className="absolute bottom-3 left-4 h-8 w-1 rounded-r" style={{ backgroundColor: cat.colorCode || '#10B981' }} />
                   </div>
                   <div className="p-5 pt-4">
                     <div className="flex items-start justify-between gap-3"><div className="flex items-center gap-3"><div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-slate-700 bg-slate-950 shadow-lg shadow-slate-950">{renderIcon(cat.icon, cat.colorCode)}</div><div><h3 className="font-bold text-white">{cat.categoryName}</h3><span className="font-mono text-[10px] font-bold text-emerald-400">{cat.categoryCode}</span></div></div><span className={`rounded-full px-2 py-1 text-[10px] font-bold ${cat.status === 'ACTIVE' ? 'bg-emerald-500/15 text-emerald-300' : 'bg-rose-500/15 text-rose-300'}`}>{cat.status}</span></div>
                     <p className="mt-4 min-h-10 text-sm leading-relaxed text-slate-400">{cat.description || 'No description provided.'}</p>
+                    {cat.monthlyLimit != null && (
+                      <div className="mt-3 flex items-center gap-2 text-xs">
+                        <Target className="w-3.5 h-3.5 text-emerald-400" />
+                        <span className="text-emerald-300 font-semibold">{cat.monthlyLimit} kg CO₂e/month</span>
+                      </div>
+                    )}
                     <div className="mt-4 flex items-center justify-between border-t border-slate-800 pt-4"><span className="text-xs text-slate-500">Display order <b className="text-slate-300">{cat.displayOrder ?? '-'}</b></span><div className="flex gap-2"><button onClick={() => openEditModal(cat)} className="rounded-lg bg-slate-800 p-2 text-teal-300 hover:bg-slate-700" title="Edit category"><Edit3 className="h-4 w-4" /></button><button onClick={() => handleToggleStatus(cat)} className="rounded-lg bg-slate-800 p-2 text-emerald-300 hover:bg-slate-700" title="Change status">{cat.status === 'ACTIVE' ? <ToggleRight className="h-4 w-4" /> : <ToggleLeft className="h-4 w-4" />}</button><button onClick={() => setDeletingCategory(cat)} className="rounded-lg bg-slate-800 p-2 text-rose-300 hover:bg-rose-950" title="Delete category"><Trash2 className="h-4 w-4" /></button></div></div>
                   </div>
                 </article>
@@ -330,6 +486,7 @@ const CategoryManagementPage = () => {
                     <th className="py-4 px-5">Code</th>
                     <th className="py-4 px-5">Category Name</th>
                     <th className="py-4 px-5">Description</th>
+                    <th className="py-4 px-5 text-right">Monthly Limit</th>
                     <th className="py-4 px-5 text-center">Order</th>
                     <th className="py-4 px-5 text-center">Status</th>
                     <th className="py-4 px-5 text-right">Actions</th>
@@ -355,6 +512,15 @@ const CategoryManagementPage = () => {
                       </td>
                       <td className="py-4 px-5 text-slate-300 max-w-xs truncate" title={cat.description}>
                         {cat.description}
+                      </td>
+                      <td className="py-4 px-5 text-right font-mono text-xs">
+                        {cat.monthlyLimit != null ? (
+                          <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-emerald-950/60 text-emerald-300 border border-emerald-800/50 font-bold">
+                            {cat.monthlyLimit} <span className="ml-1 text-slate-500">kg CO₂e</span>
+                          </span>
+                        ) : (
+                          <span className="text-slate-600">—</span>
+                        )}
                       </td>
                       <td className="py-4 px-5 text-center font-mono text-xs text-slate-400">
                         {cat.displayOrder ?? '-'}
@@ -490,6 +656,14 @@ const CategoryManagementPage = () => {
                 )}
               </div>
 
+              {/* Category Image */}
+              <ImagePicker
+                existingUrl={editingCategory?.image || null}
+                onFileChange={setImageFile}
+                imageError={imageError}
+                setImageError={setImageError}
+              />
+
               {/* Icon & Color Selector */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
@@ -572,6 +746,35 @@ const CategoryManagementPage = () => {
                   onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
                   className="w-full px-3.5 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
                 />
+              </div>
+
+              {/* Monthly Emission Limit */}
+              <div className="bg-emerald-950/20 border border-emerald-900/40 rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Target className="w-4 h-4 text-emerald-400" />
+                  <label className="text-xs font-semibold text-emerald-300 uppercase tracking-wider">
+                    Monthly Emission Limit (kg CO₂e)
+                  </label>
+                </div>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  placeholder="e.g. 100"
+                  value={formData.monthlyLimit}
+                  onChange={(e) => setFormData({ ...formData, monthlyLimit: e.target.value })}
+                  className={`w-full px-3.5 py-2.5 bg-slate-800 border rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none ${
+                    formErrors.monthlyLimit ? 'border-rose-500' : 'border-slate-700 focus:border-emerald-500'
+                  }`}
+                />
+                {formErrors.monthlyLimit && (
+                  <p className="text-rose-400 text-xs mt-1.5 flex items-center gap-1">
+                    <AlertCircle className="w-3.5 h-3.5" /> {formErrors.monthlyLimit}
+                  </p>
+                )}
+                <p className="text-xs text-slate-500 mt-1.5">
+                  Set the maximum monthly CO₂e emissions allowed for this category. Used by alerts and goals.
+                </p>
               </div>
 
               {/* Action buttons */}

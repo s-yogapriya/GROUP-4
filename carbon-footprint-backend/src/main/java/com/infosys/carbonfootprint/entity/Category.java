@@ -31,6 +31,9 @@ public class Category {
     @Column(length = 50)
     private String icon;
 
+    @Column(name = "image", length = 500)
+    private String image;
+
     @Column(name = "color_code", length = 10)
     private String colorCode;
 

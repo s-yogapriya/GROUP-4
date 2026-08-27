@@ -16,7 +16,7 @@ function statusStyle(status) {
 }
 
 export default function GoalsPage() {
-  const { showWarning } = useAuth();
+  const { showWarning, clearWarnings } = useAuth();
   const [goal, setGoal] = useState(null);
   const [history, setHistory] = useState([]);
   const [target, setTarget] = useState('');
@@ -44,9 +44,10 @@ export default function GoalsPage() {
     setSaving(true);
     try {
       await api.post('/user/goals', { targetAmount: val });
+      clearWarnings();
       const now = new Date();
       const alerts = await api.get('/user/alerts');
-      const newestGoalAlert = (alerts.data || []).filter(alert => alert.alertType === 'GOAL_EXCEEDED' && alert.month === now.getMonth() + 1 && alert.year === now.getFullYear()).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
+      const newestGoalAlert = (alerts.data || []).filter(alert => alert.alertType === 'GOAL_EXCEEDED' && alert.month === now.getMonth() + 1 && alert.year === now.getFullYear() && !alert.resolved).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
       if (newestGoalAlert) showWarning(newestGoalAlert);
       setMsg('Monthly goal saved successfully.');
       load();

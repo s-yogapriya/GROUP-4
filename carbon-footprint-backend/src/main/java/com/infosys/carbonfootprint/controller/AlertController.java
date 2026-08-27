@@ -38,6 +38,8 @@ public class AlertController {
 
     @PutMapping("/{id}/read")
     public ApiResponse<AlertDto> read(@PathVariable Long id, @AuthenticationPrincipal UserDetailsImpl user) { return ApiResponse.success("Alert marked read", service.markRead(id, user.getId())); }
+    @PutMapping("/{id}/resolve")
+    public ApiResponse<AlertDto> resolve(@PathVariable Long id, @AuthenticationPrincipal UserDetailsImpl user) { return ApiResponse.success("Alert resolved", service.resolveAlert(id, user.getId())); }
     @PutMapping("/read-all")
     public ApiResponse<Void> readAll(@AuthenticationPrincipal UserDetailsImpl user) { service.markAllRead(user.getId()); return ApiResponse.success("All alerts marked read"); }
     @DeleteMapping("/{id}")

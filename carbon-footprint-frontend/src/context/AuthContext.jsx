@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, Target, X, ArrowRight } from 'lucide-react';
+import api from '../api/axios';
 
 const AuthContext = createContext(null);
 
@@ -64,6 +65,11 @@ export const AuthProvider = ({ children }) => {
 
   const dismissWarning = useCallback((id) => {
     setWarnings(prev => prev.filter(w => w.id !== id));
+    api.put(`/user/alerts/${id}/resolve`).catch(() => {});
+  }, []);
+
+  const clearWarnings = useCallback(() => {
+    setWarnings([]);
   }, []);
 
   const login = (jwtResponse) => {
@@ -103,7 +109,7 @@ export const AuthProvider = ({ children }) => {
   const isUser = () => user?.roles?.includes('ROLE_USER');
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, setLoading, login, logout, updateUser, isAdmin, isUser, toast, showToast, showWarning }}>
+    <AuthContext.Provider value={{ user, token, loading, setLoading, login, logout, updateUser, isAdmin, isUser, toast, showToast, showWarning, clearWarnings }}>
       {children}
       {toast && (
         <div className="fixed bottom-6 right-6 z-50 animate-bounce">

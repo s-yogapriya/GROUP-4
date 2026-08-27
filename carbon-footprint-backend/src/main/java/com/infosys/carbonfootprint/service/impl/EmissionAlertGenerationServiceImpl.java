@@ -56,26 +56,53 @@ public class EmissionAlertGenerationServiceImpl implements EmissionAlertGenerati
             LocalDate from = LocalDate.of(date.getYear(), date.getMonth(), 1), to = from.plusMonths(1).minusDays(1);
             double total = logs.findByUserIdAndDateRange(userId, from, to).stream().mapToDouble(ActivityLog::getTotalEmission).sum();
             List<Alert> monthAlerts = alerts.findByUserIdAndAlertTypeAndMonthAndYearAndCategoryIsNullOrderByCreatedAtDesc(userId, AlertType.GOAL_EXCEEDED, date.getMonthValue(), date.getYear());
-            Alert matchingActiveAlert = monthAlerts.stream().filter(alert -> !alert.isResolved() && Double.compare(alert.getMonthlyLimit(), goal.getTargetAmount()) == 0).findFirst().orElse(null);
 
-            // An old target must never remain an active warning after a goal is changed.
-            monthAlerts.stream().filter(alert -> !alert.isResolved() && alert != matchingActiveAlert).forEach(alert -> { alert.setResolved(true); alert.setRead(true); });
-            Alert current = matchingActiveAlert;
+            // Step 1: Find the active alert matching the current target
+            Alert matchingActiveAlert = null;
+            for (Alert a : monthAlerts) {
+                if (!a.isResolved() && Double.compare(a.getMonthlyLimit(), goal.getTargetAmount()) == 0) {
+                    matchingActiveAlert = a;
+                    break;
+                }
+            }
 
+            // Step 2: Resolve ALL other alerts for this month (old targets that no longer apply)
+            for (Alert a : monthAlerts) {
+                if (a != matchingActiveAlert) {
+                    a.setResolved(true);
+                    a.setRead(true);
+                }
+            }
+
+            // Step 3: If emissions are within target, we're done
             if (total <= goal.getTargetAmount()) {
                 if (!monthAlerts.isEmpty()) alerts.saveAll(monthAlerts);
                 return;
             }
 
-            if (current == null) {
-                current = Alert.builder().user(users.findById(userId).orElseThrow()).alertType(AlertType.GOAL_EXCEEDED)
-                        .severity(AlertSeverity.WARNING).title("Monthly Carbon Target Exceeded")
+            // Step 4: Emissions exceed target — create/update active alert
+            if (matchingActiveAlert == null) {
+                // Only create if no unresolved alert exists for this exact target
+                boolean alreadyExists = monthAlerts.stream()
+                    .anyMatch(a -> !a.isResolved() && Double.compare(a.getMonthlyLimit(), goal.getTargetAmount()) == 0);
+                if (!alreadyExists) {
+                    matchingActiveAlert = Alert.builder()
+                        .user(users.findById(userId).orElseThrow())
+                        .alertType(AlertType.GOAL_EXCEEDED)
+                        .severity(AlertSeverity.WARNING)
+                        .title("Monthly Carbon Target Exceeded")
                         .recommendation("Review your activities across all categories to bring emissions back within your target.")
-                        .month(date.getMonthValue()).year(date.getYear()).build();
+                        .month(date.getMonthValue())
+                        .year(date.getYear())
+                        .build();
+                }
             }
-            updateCurrentGoalAlert(current, total, goal.getTargetAmount(), date);
-            alerts.save(current);
-            if (!monthAlerts.isEmpty()) alerts.saveAll(monthAlerts);
+            if (matchingActiveAlert != null) {
+                updateCurrentGoalAlert(matchingActiveAlert, total, goal.getTargetAmount(), date);
+                alerts.save(matchingActiveAlert);
+            }
+            // Persist all resolved old alerts
+            alerts.saveAll(monthAlerts.stream().filter(a -> a.isResolved()).toList());
         });
     }
 

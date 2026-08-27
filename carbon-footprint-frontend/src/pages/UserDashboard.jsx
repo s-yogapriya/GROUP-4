@@ -1,33 +1,56 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
-import { RefreshCw, Leaf, CalendarDays, CalendarRange, Activity, Layers, Target, TrendingUp, Flame, ArrowUp, ArrowDown, ArrowRight } from 'lucide-react';
+import { RefreshCw, Leaf, CalendarDays, CalendarRange, Activity, Layers, Target, TrendingUp, Flame, ArrowUp, ArrowDown, ArrowRight, Plus } from 'lucide-react';
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend } from 'recharts';
 
 const colors = ['#10b981', '#38bdf8', '#a78bfa', '#f59e0b', '#f43f5e', '#14b8a6'];
 const val = x => Number(x || 0);
 const kg = x => `${val(x).toFixed(2)} kg CO2e`;
 
-function aggregate(logs) {
-  const now = new Date(), today = now.toISOString().slice(0, 10), month = today.slice(0, 7), year = today.slice(0, 4);
-  const group = (key, name) => Object.values(logs.reduce((a, l) => {
+function getDateRange(period) {
+  const now = new Date();
+  const today = now.toISOString().slice(0, 10);
+  const year = today.slice(0, 4);
+  const month = today.slice(0, 7);
+  switch (period) {
+    case 'day': return { start: today, end: today, month, year };
+    case 'month': {
+      const first = `${month}-01`;
+      const lastDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      const last = `${month}-${String(lastDate.getDate()).padStart(2, '0')}`;
+      return { start: first, end: last, month, year };
+    }
+    case 'year': return { start: `${year}-01-01`, end: `${year}-12-31`, month, year };
+    default: return { start: null, end: null, month, year };
+  }
+}
+
+function aggregate(logs, period) {
+  const { start, end, month, year } = getDateRange(period);
+  const filtered = period === 'all' ? logs : logs.filter(l => l.activityDate >= start && l.activityDate <= end);
+  const group = (key, name) => Object.values(filtered.reduce((a, l) => {
     const k = key(l); a[k] ??= { key: k, name: name(l), emission: 0, activities: 0 };
     a[k].emission += val(l.totalEmission); a[k].activities++; return a;
   }, {})).sort((a, b) => a.key.localeCompare(b.key));
-  const total = logs.reduce((s, l) => s + val(l.totalEmission), 0);
+  const total = filtered.reduce((s, l) => s + val(l.totalEmission), 0);
   const cats = group(l => String(l.categoryId || l.categoryName), l => l.categoryName || 'Other').sort((a, b) => b.emission - a.emission);
+  const dailyAll = logs.filter(l => l.activityDate);
+  const dailyAllGrouped = group(l => l.activityDate, l => l.activityDate);
   return {
     total,
-    today: logs.filter(l => l.activityDate === today).reduce((s, l) => s + val(l.totalEmission), 0),
-    month: logs.filter(l => l.activityDate?.startsWith(month)).reduce((s, l) => s + val(l.totalEmission), 0),
-    year: logs.filter(l => l.activityDate?.startsWith(year)).reduce((s, l) => s + val(l.totalEmission), 0),
-    activities: logs.length,
+    filtered,
+    today: logs.filter(l => l.activityDate === new Date().toISOString().slice(0, 10)).reduce((s, l) => s + val(l.totalEmission), 0),
+    monthAll: logs.filter(l => l.activityDate?.startsWith(month)).reduce((s, l) => s + val(l.totalEmission), 0),
+    yearAll: logs.filter(l => l.activityDate?.startsWith(year)).reduce((s, l) => s + val(l.totalEmission), 0),
+    activities: filtered.length,
     cats: cats.map(c => ({ ...c, percent: total ? c.emission / total * 100 : 0 })),
     daily: group(l => l.activityDate, l => l.activityDate),
     monthly: group(l => l.activityDate.slice(0, 7), l => new Date(`${l.activityDate.slice(0, 7)}-01`).toLocaleString('en', { month: 'short', year: '2-digit' })),
     yearly: group(l => l.activityDate.slice(0, 4), l => l.activityDate.slice(0, 4)),
-    average: logs.length ? total / logs.length : 0,
+    average: filtered.length ? total / filtered.length : 0,
+    allDaily: dailyAllGrouped,
   };
 }
 
@@ -57,17 +80,17 @@ const Chart = ({ title, data, type = 'line' }) => (
 );
 
 export function AnalyticsContent({ reports = false }) {
-  const { showWarning } = useAuth();
+  const { showWarning, clearWarnings } = useAuth();
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [period, setPeriod] = useState('month');
+  const [period, setPeriod] = useState('all');
   const [goal, setGoal] = useState(null);
-  // Server-calculated streak and sustainability score.
   const [summary, setSummary] = useState(null);
 
   const load = async () => {
     setLoading(true); setError('');
+    clearWarnings();
     try {
       const r = await api.get('/user/activities');
       setLogs(r.data || []);
@@ -80,30 +103,27 @@ export function AnalyticsContent({ reports = false }) {
   };
 
   useEffect(() => { load(); }, []);
-  useEffect(() => { api.get('/user/goals/current').then(r => setGoal(r.data)).catch(() => {}); }, []);
-  useEffect(() => {
-    if (reports) return;
-    api.get('/user/alerts/current-goal').then(r => {
-      if (r.data) showWarning(r.data);
-    }).catch(() => {});
-  }, [reports, showWarning]);
-  // Re-fetch summary whenever logs change so streak/score stay in sync after new activity
-  useEffect(() => {
-    api.get('/user/dashboard/summary').then(r => setSummary(r.data)).catch(() => {});
-  }, [logs]);
 
-  const a = useMemo(() => aggregate(logs), [logs]);
+  const loadGoal = useCallback(() => {
+    api.get('/user/goals/current').then(r => setGoal(r.data)).catch(() => {});
+  }, []);
+
+  useEffect(() => { loadGoal(); }, [loadGoal]);
+
+  useEffect(() => {
+    const p = period.toUpperCase();
+    api.get(`/user/dashboard/summary?period=${p}`).then(r => setSummary(r.data)).catch(() => {});
+  }, [logs, period]);
+
+  const a = useMemo(() => aggregate(logs, period), [logs, period]);
 
   const previousMonth = new Date();
   previousMonth.setMonth(previousMonth.getMonth() - 1);
   const previousKey = `${previousMonth.getFullYear()}-${String(previousMonth.getMonth() + 1).padStart(2, '0')}`;
   const previousEmission = logs.filter(l => l.activityDate?.startsWith(previousKey)).reduce((sum, l) => sum + val(l.totalEmission), 0);
-  const change = previousEmission ? ((a.month - previousEmission) / previousEmission) * 100 : null;
+  const change = previousEmission ? ((a.monthAll - previousEmission) / previousEmission) * 100 : null;
 
-  // Use server-calculated streak (correct LocalDate arithmetic, no JS timezone issues)
   const streak = summary?.trackingStreak ?? 0;
-
-  // Sustainability score from server
   const score = summary?.sustainabilityScore ?? 0;
   const scoreStatus = summary?.sustainabilityStatus ?? '';
   const hasActivities = summary?.hasActivities ?? false;
@@ -120,7 +140,19 @@ export function AnalyticsContent({ reports = false }) {
     shopping: ['Reuse products where possible.', 'Plan purchases to avoid unnecessary items.'],
   };
   const rec = actions[(a.cats[0]?.name || '').toLowerCase()] || ['Keep tracking activities to discover tailored actions.'];
-  const trend = period === 'day' ? a.daily : period === 'year' ? a.yearly : a.monthly;
+  const trend = period === 'day' ? a.daily : period === 'year' ? a.yearly : period === 'all' ? a.allDaily : a.monthly;
+
+  const footprintLabel = period === 'day' ? "Today's Footprint" : period === 'month' ? 'Monthly Footprint' : period === 'year' ? 'Yearly Footprint' : 'Total Footprint';
+  const trendTitle = period === 'day' ? "Today's Carbon Footprint" : period === 'month' ? 'Monthly Carbon Footprint Trend' : period === 'year' ? 'Yearly Carbon Footprint Trend' : 'Carbon Footprint Trend';
+  const catDistTitle = period === 'day' ? "Today's Emissions by Category" : period === 'month' ? "This Month's Emissions by Category" : period === 'year' ? "This Year's Emissions by Category" : 'Emissions Distribution by Category';
+  const monthlyTrendTitle = period === 'day' ? "Today's Activity Breakdown" : 'Monthly Carbon Footprint Trend';
+  const yearlyTitle = period === 'year' ? 'Monthly Carbon Footprint (This Year)' : period === 'all' ? 'Yearly Carbon Footprint' : 'Yearly Carbon Footprint';
+  const recentTitle = reports ? 'Detailed Category Breakdown' : 'Recent Activity Logs';
+
+  const recentLogs = useMemo(() => {
+    const sorted = [...a.filtered].sort((x, y) => (y.activityDate || '').localeCompare(x.activityDate || '') || (y.createdAt || '').localeCompare(x.createdAt || ''));
+    return reports ? a.cats : sorted.slice(0, 6);
+  }, [a.filtered, a.cats, reports]);
 
   return (
     <main className="mx-auto max-w-7xl space-y-6 px-5 py-8 lg:px-8">
@@ -145,10 +177,10 @@ export function AnalyticsContent({ reports = false }) {
         <>
           {/* Summary stat cards */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <Card label="Total Footprint" value={kg(a.total)} icon={Leaf} />
+            <Card label={footprintLabel} value={kg(a.total)} icon={Leaf} />
             <Card label="Today's Emission" value={kg(a.today)} icon={CalendarDays} />
-            <Card label="This Month" value={kg(a.month)} icon={CalendarRange} />
-            <Card label="This Year" value={kg(a.year)} icon={TrendingUp} />
+            <Card label="This Month" value={kg(a.monthAll)} icon={CalendarRange} />
+            <Card label="This Year" value={kg(a.yearAll)} icon={TrendingUp} />
             <Card label="Total Activities" value={a.activities} icon={Activity} />
             <Card label="Categories Used" value={a.cats.length} icon={Layers} />
             <Card label="Average per Activity" value={kg(a.average)} icon={Target} />
@@ -157,18 +189,17 @@ export function AnalyticsContent({ reports = false }) {
 
           {/* Period selector */}
           <div className="flex gap-2 rounded-xl border border-slate-700 bg-slate-800 p-1 w-fit">
-            {['day', 'month', 'year'].map(p => (
-              <button key={p} onClick={() => setPeriod(p)}
-                className={`rounded-lg px-4 py-2 text-xs font-bold capitalize ${period === p ? 'bg-emerald-500 text-slate-950' : 'text-slate-400'}`}>
-                {p}
+            {[['all', 'All'], ['day', 'Day'], ['month', 'Month'], ['year', 'Year']].map(([key, label]) => (
+              <button key={key} onClick={() => setPeriod(key)}
+                className={`rounded-lg px-4 py-2 text-xs font-bold ${period === key ? 'bg-emerald-500 text-slate-950' : 'text-slate-400'}`}>
+                {label}
               </button>
             ))}
           </div>
 
           {/* 4-card insight row */}
           <section className="grid gap-4 lg:grid-cols-4">
-
-            {/* Tracking Streak (server-calculated) */}
+            {/* Tracking Streak */}
             <div className="rounded-2xl border border-slate-700 bg-slate-800/50 p-5">
               <p className="text-xs font-bold uppercase text-slate-400">Tracking Streak</p>
               <p className="mt-2 flex items-center gap-2 text-2xl font-black text-white"><Flame className="h-6 w-6 text-amber-400" />{streak} day{streak === 1 ? '' : 's'}</p>
@@ -177,16 +208,18 @@ export function AnalyticsContent({ reports = false }) {
               </p>
             </div>
 
-            {/* Compared with last month */}
-            <div className="rounded-2xl border border-slate-700 bg-slate-800/50 p-5">
-              <p className="text-xs font-bold uppercase text-slate-400">Compared With Last Month</p>
-              <p className="mt-2 font-bold text-white">{kg(a.month)}</p>
-              <p className={`text-sm ${change !== null && change > 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
-                {change === null ? 'No previous-month data' : <span className="inline-flex items-center gap-1">{change > 0 ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}{Math.abs(change).toFixed(1)}% vs {kg(previousEmission)}</span>}
-              </p>
-            </div>
+            {/* Compared with last month — only meaningful for month period */}
+            {period === 'month' && (
+              <div className="rounded-2xl border border-slate-700 bg-slate-800/50 p-5">
+                <p className="text-xs font-bold uppercase text-slate-400">Compared With Last Month</p>
+                <p className="mt-2 font-bold text-white">{kg(a.monthAll)}</p>
+                <p className={`text-sm ${change !== null && change > 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
+                  {change === null ? 'No previous-month data' : <span className="inline-flex items-center gap-1">{change > 0 ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}{Math.abs(change).toFixed(1)}% vs {kg(previousEmission)}</span>}
+                </p>
+              </div>
+            )}
 
-            {/* Sustainability Score (server-calculated) */}
+            {/* Sustainability Score */}
             <div className="rounded-2xl border border-slate-700 bg-slate-800/50 p-5">
               <p className="text-xs font-bold uppercase text-slate-400">Sustainability Score</p>
               {hasActivities ? (
@@ -205,18 +238,18 @@ export function AnalyticsContent({ reports = false }) {
               )}
             </div>
 
-            {/* Monthly Goal */}
+            {/* Monthly Goal — always shows current month */}
             <div className="rounded-2xl border border-slate-700 bg-slate-800/50 p-5">
               <p className="text-xs font-bold uppercase text-slate-400">Monthly Goal</p>
               {goal ? (
                 <>
-                  <p className="mt-2 font-bold text-white">{kg(a.month)} / {kg(goal.targetAmount)}</p>
+                  <p className="mt-2 font-bold text-white">{kg(a.monthAll)} / {kg(goal.targetAmount)}</p>
                   <div className="mt-2 h-2 overflow-hidden rounded bg-slate-700">
-                    <div className={`h-full ${goal.currentEmission > goal.targetAmount ? 'bg-rose-400' : 'bg-emerald-400'}`}
-                      style={{ width: `${Math.min(100, a.month / (goal.targetAmount || 1) * 100)}%` }} />
+                    <div className={`h-full ${a.monthAll > goal.targetAmount ? 'bg-rose-400' : 'bg-emerald-400'}`}
+                      style={{ width: `${Math.min(100, a.monthAll / (goal.targetAmount || 1) * 100)}%` }} />
                   </div>
                   <p className="mt-1 text-xs text-slate-400">
-                    {a.month > goal.targetAmount ? 'Target exceeded' : `${(a.month / goal.targetAmount * 100).toFixed(0)}% of monthly goal`}
+                    {a.monthAll > goal.targetAmount ? 'Target exceeded' : `${(a.monthAll / goal.targetAmount * 100).toFixed(0)}% of monthly goal`}
                   </p>
                   <Link to="/user/goals" className="mt-2 block text-xs text-emerald-400 hover:underline">View Goal <ArrowRight className="inline h-3.5 w-3.5" /></Link>
                 </>
@@ -227,6 +260,16 @@ export function AnalyticsContent({ reports = false }) {
                 </div>
               )}
             </div>
+
+            {/* Log Daily Activity shortcut */}
+            <Link to="/user/activities" className="group rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-5 transition-colors hover:bg-emerald-500/20">
+              <div className="flex justify-between text-xs font-semibold uppercase tracking-wider text-emerald-400">
+                <span>Quick Action</span><Plus className="h-4 w-4" />
+              </div>
+              <p className="mt-3 text-lg font-bold text-white">Log Daily Activity</p>
+              <p className="mt-1 text-sm text-slate-400">Record a new activity and calculate your carbon footprint.</p>
+              <p className="mt-3 text-sm font-bold text-emerald-400 group-hover:text-emerald-300">Add Activity <ArrowRight className="inline h-3.5 w-3.5" /></p>
+            </Link>
           </section>
 
           {/* Insights + recommendations */}
@@ -250,12 +293,19 @@ export function AnalyticsContent({ reports = false }) {
             ))}
           </section>
 
-          <Chart title={`${period[0].toUpperCase() + period.slice(1)} Carbon Footprint`} data={trend} type={period === 'day' ? 'line' : 'bar'} />
+          {/* Period trend chart */}
+          <Chart title={trendTitle} data={trend} type={period === 'day' ? 'line' : 'bar'} />
 
           <div className="grid gap-6 lg:grid-cols-2">
-            <Chart title="Monthly Carbon Footprint Trend" data={a.daily.filter(x => x.key.startsWith(new Date().toISOString().slice(0, 7)))} type="line" />
+            {/* Monthly trend / daily breakdown */}
+            <Chart
+              title={monthlyTrendTitle}
+              data={period === 'day' ? a.daily : a.daily.filter(x => x.key.startsWith(new Date().toISOString().slice(0, 7)))}
+              type="line"
+            />
+            {/* Emissions Distribution by Category */}
             <section className="rounded-2xl border border-slate-700/70 bg-slate-800/50 p-5">
-              <h2 className="font-bold text-white">Emissions Distribution by Category</h2>
+              <h2 className="font-bold text-white">{catDistTitle}</h2>
               {a.cats.length ? (
                 <>
                   <div className="h-64">
@@ -281,15 +331,16 @@ export function AnalyticsContent({ reports = false }) {
             </section>
           </div>
 
-          <Chart title="Yearly Carbon Footprint" data={a.monthly.filter(x => x.key.startsWith(String(new Date().getFullYear())))} type="bar" />
+          {/* Yearly Carbon Footprint */}
+          <Chart title={yearlyTitle} data={period === 'all' ? a.yearly : a.monthly.filter(x => x.key.startsWith(String(new Date().getFullYear())))} type="bar" />
 
           {/* Recent logs / category breakdown table */}
           <section className="overflow-hidden rounded-2xl border border-slate-700/70 bg-slate-800/50">
             <div className="flex items-center justify-between border-b border-slate-700 p-5">
-              <h2 className="font-bold text-white">{reports ? 'Detailed Category Breakdown' : 'Recent Activity Logs'}</h2>
+              <h2 className="font-bold text-white">{recentTitle}</h2>
               {!reports && <Link className="text-sm font-semibold text-emerald-400" to="/user/history">View Full History <ArrowRight className="inline h-3.5 w-3.5" /></Link>}
             </div>
-            {(reports ? a.cats : logs.slice(0, 6)).length ? (
+            {recentLogs.length ? (
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm">
                   <thead className="bg-slate-900/70 text-xs uppercase text-slate-400">
@@ -301,7 +352,7 @@ export function AnalyticsContent({ reports = false }) {
                     </tr>
                   </thead>
                   <tbody>
-                    {(reports ? a.cats : logs.slice(0, 6)).map(x => reports
+                    {recentLogs.map(x => reports
                       ? <tr key={x.key} className="border-t border-slate-800"><td className="p-3">{x.name}</td><td className="p-3">{kg(x.emission)}</td><td className="p-3">{x.activities}</td><td className="p-3">{x.percent.toFixed(1)}%</td></tr>
                       : <tr key={x.activityLogId} className="border-t border-slate-800"><td className="p-3">{x.activityDate}</td><td className="p-3">{x.categoryName}</td><td className="p-3">{x.activityTypeName}</td><td className="p-3">{x.quantity} {x.unit}</td><td className="p-3">{x.emissionFactor}</td><td className="p-3 text-emerald-400">{kg(x.totalEmission)}</td></tr>
                     )}

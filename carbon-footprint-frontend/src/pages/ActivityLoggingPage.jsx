@@ -2,7 +2,14 @@ import React, { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
-import { Activity, Plus, Calendar, Leaf, Trash2, Edit3, Search, RefreshCw, AlertCircle } from 'lucide-react';
+import { Activity, Plus, Calendar, Leaf, Trash2, Edit3, Search, RefreshCw, AlertCircle,
+  Car, Zap, Utensils, ShoppingBag, Truck, Flame, Factory, TreePine,
+  Wind, Plane, Bike, Bus, Train, Trash, Home, Globe, CheckCircle2, Layers, Sun, Package } from 'lucide-react';
+
+const ICON_MAP = {
+  Car, Zap, Utensils, ShoppingBag, Truck, Flame, Factory, TreePine,
+  Wind, Plane, Bike, Bus, Train, Trash, Home, Globe, Activity, Sun, Package,
+};
 
 const ActivityLoggingPage = () => {
   const { showToast, showWarning } = useAuth();
@@ -299,154 +306,188 @@ const ActivityLoggingPage = () => {
                 {editingLog ? 'Edit Activity' : 'Log New Activity'}
               </h2>
 
-              <form onSubmit={handleSubmit} className="space-y-4">
+              <form onSubmit={handleSubmit} className="space-y-5">
+                {/* STEP 1: Category Selection */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
-                    Category <span className="text-rose-400">*</span>
-                  </label>
-                  <select
-                    value={formData.categoryId}
-                    onChange={(e) => {
-                      setSelectedCategoryId(e.target.value);
-                      setFormData({ ...formData, categoryId: e.target.value, activityTypeId: '', quantity: '' });
-                      setSelectedActivityType(null);
-                      setEmissionFactor(null);
-                      setFormErrors((previous) => ({ ...previous, categoryId: undefined, activityTypeId: undefined, quantity: undefined }));
-                    }}
-                    className={`w-full px-3.5 py-2.5 bg-slate-900 border rounded-xl text-sm text-white focus:outline-none ${
-                      formErrors.categoryId ? 'border-rose-500' : 'border-slate-700 focus:border-emerald-500'
-                    }`}
-                  >
-                    <option value="">-- Select Category --</option>
-                    {categories.map((cat) => (
-                      <option key={cat.categoryId} value={cat.categoryId}>
-                        {cat.categoryName}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-emerald-400">
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-[10px] text-slate-950">1</span>
+                    Choose Category
+                  </div>
+                  {loading ? (
+                    <p className="text-xs text-slate-400">Loading categories...</p>
+                  ) : categories.length === 0 ? (
+                    <p className="text-xs text-rose-400">{categoryLoadError || 'No active categories available.'}</p>
+                  ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                      {categories.map((cat) => {
+                        const IconComp = ICON_MAP[cat.icon] || Layers;
+                        const isSelected = String(formData.categoryId) === String(cat.categoryId);
+                        return (
+                          <button
+                            key={cat.categoryId}
+                            type="button"
+                            onClick={() => {
+                              setSelectedCategoryId(cat.categoryId);
+                              setFormData({ ...formData, categoryId: cat.categoryId, activityTypeId: '', quantity: '' });
+                              setSelectedActivityType(null);
+                              setEmissionFactor(null);
+                              setFormErrors((prev) => ({ ...prev, categoryId: undefined, activityTypeId: undefined, quantity: undefined }));
+                            }}
+                            className={`relative flex flex-col items-center gap-2 p-3.5 rounded-xl border text-center transition-all ${
+                              isSelected
+                                ? 'bg-emerald-950/60 border-emerald-500/70 shadow-lg shadow-emerald-950/30'
+                                : 'bg-slate-900 border-slate-700 hover:border-slate-500 hover:bg-slate-800'
+                            }`}
+                          >
+                            <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${isSelected ? 'bg-emerald-500/20' : 'bg-slate-800'}`}>
+                              <IconComp className={`w-5 h-5 ${isSelected ? 'text-emerald-400' : 'text-slate-400'}`} />
+                            </div>
+                            <span className={`text-xs font-semibold ${isSelected ? 'text-emerald-300' : 'text-slate-300'}`}>{cat.categoryName}</span>
+                            {isSelected && <CheckCircle2 className="absolute top-2 right-2 w-3.5 h-3.5 text-emerald-400" />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                   {formErrors.categoryId && (
-                    <p className="text-rose-400 text-xs mt-1 flex items-center gap-1">
+                    <p className="text-rose-400 text-xs mt-1.5 flex items-center gap-1">
                       <AlertCircle className="w-3.5 h-3.5" /> {formErrors.categoryId}
                     </p>
                   )}
-                  {loading && <p className="mt-1 text-xs text-slate-400">Loading categories...</p>}
-                  {!loading && !categories.length && <p className="mt-1 text-xs text-rose-400">{categoryLoadError || 'No active categories available.'}</p>}
                 </div>
 
-                <div>
-                  <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-emerald-400"><span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-[10px] text-slate-950">3</span>Activity details</div>
-                  <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
-                    Activity Type <span className="text-rose-400">*</span>
-                  </label>
-                  <select
-                    value={formData.activityTypeId}
-                    onChange={(e) => {
-                      const act = activityTypes.find((a) => a.activityTypeId === Number(e.target.value));
-                      handleActivityTypeChange(act);
-                    }}
-                    disabled={!selectedCategoryId || typesLoading}
-                    className={`w-full px-3.5 py-2.5 bg-slate-900 border rounded-xl text-sm text-white focus:outline-none ${
-                      formErrors.activityTypeId ? 'border-rose-500' : 'border-slate-700 focus:border-emerald-500'
-                    } ${!selectedCategoryId ? 'opacity-50 cursor-not-allowed' : ''}`}
-                  >
-                    <option value="">-- Select Activity Type --</option>
-                    {activityTypes.map((act) => (
-                        <option key={act.activityTypeId} value={act.activityTypeId}>
-                          {act.activityName}
-                        </option>
-                      ))}
-                  </select>
-                  {formErrors.activityTypeId && (
-                    <p className="text-rose-400 text-xs mt-1 flex items-center gap-1">
-                      <AlertCircle className="w-3.5 h-3.5" /> {formErrors.activityTypeId}
-                    </p>
-                  )}
-                  {typesLoading && <p className="mt-1 text-xs text-slate-400">Loading activity types...</p>}
-                  {selectedCategoryId && !typesLoading && !activityTypes.length && <p className="mt-1 text-xs text-rose-400">{typeLoadError || 'No active activity types available for this category.'}</p>}
-                </div>
+                {/* STEP 2: Activity Type Selection */}
+                {selectedCategoryId && (
+                  <div>
+                    <div className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-emerald-400">
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-[10px] text-slate-950">2</span>
+                      Choose Activity
+                    </div>
+                    {typesLoading ? (
+                      <p className="text-xs text-slate-400">Loading activity types...</p>
+                    ) : activityTypes.length === 0 ? (
+                      <p className="text-xs text-rose-400">{typeLoadError || 'No active activity types available for this category.'}</p>
+                    ) : (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                        {activityTypes.map((act) => {
+                          const isSelected = String(formData.activityTypeId) === String(act.activityTypeId);
+                          const ActIcon = ICON_MAP[act.icon] || Activity;
+                          return (
+                            <button
+                              key={act.activityTypeId}
+                              type="button"
+                              onClick={() => handleActivityTypeChange(act)}
+                              className={`relative flex flex-col items-center gap-1.5 p-3 rounded-xl border text-center transition-all ${
+                                isSelected
+                                  ? 'bg-emerald-950/60 border-emerald-500/70 shadow-lg shadow-emerald-950/30'
+                                  : 'bg-slate-900 border-slate-700 hover:border-slate-500 hover:bg-slate-800'
+                              }`}
+                            >
+                              <ActIcon className={`w-4 h-4 ${isSelected ? 'text-emerald-400' : 'text-slate-400'}`} />
+                              <span className={`text-xs font-semibold ${isSelected ? 'text-emerald-300' : 'text-slate-300'}`}>{act.activityName}</span>
+                              {isSelected && <CheckCircle2 className="absolute top-2 right-2 w-3.5 h-3.5 text-emerald-400" />}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                    {formErrors.activityTypeId && (
+                      <p className="text-rose-400 text-xs mt-1.5 flex items-center gap-1">
+                        <AlertCircle className="w-3.5 h-3.5" /> {formErrors.activityTypeId}
+                      </p>
+                    )}
+                  </div>
+                )}
 
+                {/* STEP 3: Activity Details */}
                 {selectedActivityType && (
-                  <div className="bg-emerald-950/30 border border-emerald-900/50 rounded-xl p-3">
-                    <div className="flex items-center gap-2 text-xs text-emerald-400">
-                      <Leaf className="w-3.5 h-3.5" />
-                      <span className="font-semibold">Unit: {selectedActivityType.unit}</span>
-                      {selectedActivityType.minQuantity && (
-                        <span className="text-slate-400">| Min: {selectedActivityType.minQuantity}</span>
-                      )}
-                      {selectedActivityType.maxQuantity && (
-                        <span className="text-slate-400">| Max: {selectedActivityType.maxQuantity}</span>
-                      )}
+                  <div>
+                    <div className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-emerald-400">
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-[10px] text-slate-950">3</span>
+                      Activity Details
+                    </div>
+
+                    <div className="bg-emerald-950/30 border border-emerald-900/50 rounded-xl p-3 mb-4">
+                      <div className="flex items-center gap-2 text-xs text-emerald-400">
+                        <Leaf className="w-3.5 h-3.5" />
+                        <span className="font-semibold">Unit: {selectedActivityType.unit}</span>
+                        {selectedActivityType.minQuantity != null && (
+                          <span className="text-slate-400">| Min: {selectedActivityType.minQuantity}</span>
+                        )}
+                        {selectedActivityType.maxQuantity != null && (
+                          <span className="text-slate-400">| Max: {selectedActivityType.maxQuantity}</span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+                          Quantity <span className="text-rose-400">*</span>
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min={selectedActivityType?.minQuantity ?? undefined}
+                          max={selectedActivityType?.maxQuantity ?? undefined}
+                          placeholder={`Enter quantity in ${selectedActivityType?.unit || 'unit'}`}
+                          value={formData.quantity}
+                          onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
+                          className={`w-full px-3.5 py-2.5 bg-slate-900 border rounded-xl text-sm text-white focus:outline-none ${
+                            formErrors.quantity ? 'border-rose-500' : 'border-slate-700 focus:border-emerald-500'
+                          }`}
+                        />
+                        {formErrors.quantity && (
+                          <p className="text-rose-400 text-xs mt-1 flex items-center gap-1">
+                            <AlertCircle className="w-3.5 h-3.5" /> {formErrors.quantity}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="rounded-xl border border-emerald-900/50 bg-emerald-950/30 p-3 text-xs">
+                        {factorLoading ? <span className="text-slate-400">Loading emission factor...</span> : emissionFactor ? <>
+                          <p className="font-semibold text-emerald-400">Emission factor: {emissionFactor.emissionFactor} kg CO₂e/{selectedActivityType.unit}</p>
+                          {formData.quantity !== '' && Number.isFinite(Number(formData.quantity)) && <p className="mt-1 text-slate-300">Estimated emission: <span className="font-bold text-emerald-300">{(Number(formData.quantity) * emissionFactor.emissionFactor).toFixed(2)} kg CO₂e</span></p>}
+                        </> : <p className="text-rose-400">No active emission factor is configured for this activity. Please contact the administrator.</p>}
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+                          Activity Date <span className="text-rose-400">*</span>
+                        </label>
+                        <div className="relative">
+                          <Calendar className="w-4 h-4 text-slate-500 absolute left-3.5 top-3" />
+                          <input
+                            type="date"
+                            value={formData.activityDate}
+                            onChange={(e) => setFormData({ ...formData, activityDate: e.target.value })}
+                            className={`w-full pl-10 pr-3.5 py-2.5 bg-slate-900 border rounded-xl text-sm text-white focus:outline-none ${
+                              formErrors.activityDate ? 'border-rose-500' : 'border-slate-700 focus:border-emerald-500'
+                            }`}
+                          />
+                        </div>
+                        {formErrors.activityDate && (
+                          <p className="text-rose-400 text-xs mt-1 flex items-center gap-1">
+                            <AlertCircle className="w-3.5 h-3.5" /> {formErrors.activityDate}
+                          </p>
+                        )}
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+                          Notes (Optional)
+                        </label>
+                        <textarea
+                          rows="2"
+                          placeholder="Add any additional details..."
+                          value={formData.notes}
+                          onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                          className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-sm text-white focus:outline-none focus:border-emerald-500"
+                        />
+                      </div>
                     </div>
                   </div>
                 )}
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
-                    Quantity <span className="text-rose-400">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min={selectedActivityType?.minQuantity ?? undefined}
-                    max={selectedActivityType?.maxQuantity ?? undefined}
-                    placeholder={`Enter quantity in ${selectedActivityType?.unit || 'unit'}`}
-                    value={formData.quantity}
-                    onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
-                    className={`w-full px-3.5 py-2.5 bg-slate-900 border rounded-xl text-sm text-white focus:outline-none ${
-                      formErrors.quantity ? 'border-rose-500' : 'border-slate-700 focus:border-emerald-500'
-                    }`}
-                  />
-                  {formErrors.quantity && (
-                    <p className="text-rose-400 text-xs mt-1 flex items-center gap-1">
-                      <AlertCircle className="w-3.5 h-3.5" /> {formErrors.quantity}
-                    </p>
-                  )}
-                  {selectedActivityType && <p className="mt-1 text-xs text-slate-400">Unit: {selectedActivityType.unit}</p>}
-                </div>
-
-                {selectedActivityType && (
-                  <div className="rounded-xl border border-emerald-900/50 bg-emerald-950/30 p-3 text-xs">
-                    {factorLoading ? <span className="text-slate-400">Loading emission factor...</span> : emissionFactor ? <>
-                      <p className="font-semibold text-emerald-400">Emission factor: {emissionFactor.emissionFactor} kg CO₂e/{selectedActivityType.unit}</p>
-                      {formData.quantity !== '' && Number.isFinite(Number(formData.quantity)) && <p className="mt-1 text-slate-300">Estimated emission: <span className="font-bold text-emerald-300">{(Number(formData.quantity) * emissionFactor.emissionFactor).toFixed(2)} kg CO₂e</span></p>}
-                    </> : <p className="text-rose-400">No active emission factor is configured for this activity. Please contact the administrator.</p>}
-                  </div>
-                )}
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
-                    Activity Date <span className="text-rose-400">*</span>
-                  </label>
-                  <div className="relative">
-                    <Calendar className="w-4 h-4 text-slate-500 absolute left-3.5 top-3" />
-                    <input
-                      type="date"
-                      value={formData.activityDate}
-                      onChange={(e) => setFormData({ ...formData, activityDate: e.target.value })}
-                      className={`w-full pl-10 pr-3.5 py-2.5 bg-slate-900 border rounded-xl text-sm text-white focus:outline-none ${
-                        formErrors.activityDate ? 'border-rose-500' : 'border-slate-700 focus:border-emerald-500'
-                      }`}
-                    />
-                  </div>
-                  {formErrors.activityDate && (
-                    <p className="text-rose-400 text-xs mt-1 flex items-center gap-1">
-                      <AlertCircle className="w-3.5 h-3.5" /> {formErrors.activityDate}
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
-                    Notes (Optional)
-                  </label>
-                  <textarea
-                    rows="2"
-                    placeholder="Add any additional details..."
-                    value={formData.notes}
-                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                    className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-sm text-white focus:outline-none focus:border-emerald-500"
-                  />
-                </div>
 
                 <button
                   type="submit"

@@ -23,6 +23,7 @@ import ArticlesPage from './pages/ArticlesPage';
 import AdminEmissionLimitsPage from './pages/AdminEmissionLimitsPage';
 import AdminArticlesPage from './pages/AdminArticlesPage';
 import ProtectedRoute from './components/ProtectedRoute';
+import ChatbotWidget from './components/ChatbotWidget';
 import { useAuth } from './context/AuthContext';
 
 function PublicOnly({ children }) {
@@ -32,39 +33,42 @@ function PublicOnly({ children }) {
 
 function App() {
   return (
-    <Routes>
-      <Route path="/" element={<PublicOnly><LandingPage /></PublicOnly>} />
-      <Route path="/register" element={<PublicOnly><RegisterPage /></PublicOnly>} />
-      <Route path="/login" element={<PublicOnly><UserLoginPage /></PublicOnly>} />
-      <Route path="/admin/login" element={<PublicOnly><AdminLoginPage /></PublicOnly>} />
-      <Route path="/reset-password" element={<ProtectedRoute><ResetPasswordPage /></ProtectedRoute>} />
+    <>
+      <Routes>
+        <Route path="/" element={<PublicOnly><LandingPage /></PublicOnly>} />
+        <Route path="/register" element={<PublicOnly><RegisterPage /></PublicOnly>} />
+        <Route path="/login" element={<PublicOnly><UserLoginPage /></PublicOnly>} />
+        <Route path="/admin/login" element={<PublicOnly><AdminLoginPage /></PublicOnly>} />
+        <Route path="/reset-password" element={<ProtectedRoute><ResetPasswordPage /></ProtectedRoute>} />
 
-      <Route path="/admin" element={<ProtectedRoute requireAdmin={true}><AdminShell /></ProtectedRoute>}>
-        <Route path="dashboard" element={<AdminDashboard />} />
-        <Route path="users" element={<AdminDashboard />} />
-        <Route path="categories" element={<CategoryManagementPage />} />
-        <Route path="activity-types" element={<ActivityTypeManagementPage />} />
-        <Route path="emission-factors" element={<EmissionFactorManagementPage />} />
-        <Route path="activity-logs" element={<AdminActivityLogsPage />} />
-        <Route path="emission-limits" element={<AdminEmissionLimitsPage />} />
-        <Route path="articles" element={<AdminArticlesPage />} />
-      </Route>
+        <Route path="/admin" element={<ProtectedRoute requireAdmin={true}><AdminShell /></ProtectedRoute>}>
+          <Route path="dashboard" element={<AdminDashboard />} />
+          <Route path="users" element={<AdminDashboard />} />
+          <Route path="categories" element={<CategoryManagementPage />} />
+          <Route path="activity-types" element={<ActivityTypeManagementPage />} />
+          <Route path="emission-factors" element={<EmissionFactorManagementPage />} />
+          <Route path="activity-logs" element={<AdminActivityLogsPage />} />
+          <Route path="emission-limits" element={<AdminEmissionLimitsPage />} />
+          <Route path="articles" element={<AdminArticlesPage />} />
+        </Route>
 
-      <Route path="/user" element={<ProtectedRoute><UserShell /></ProtectedRoute>}>
-        <Route path="dashboard" element={<UserDashboard />} />
-        <Route path="activities" element={<ActivityLoggingPage />} />
-        <Route path="history" element={<ActivityLoggingPage />} />
-        <Route path="reports" element={<ReportsAnalyticsPage />} />
-        <Route path="profile" element={<MyProfilePage />} />
-        <Route path="alerts" element={<AlertHistoryPage />} />
-        <Route path="goals" element={<GoalsPage />} />
-        <Route path="recommendations" element={<RecommendationsPage />} />
-        <Route path="articles" element={<ArticlesPage />} />
-        <Route path="articles/:id" element={<ArticlesPage />} />
-      </Route>
+        <Route path="/user" element={<ProtectedRoute><UserShell /></ProtectedRoute>}>
+          <Route path="dashboard" element={<UserDashboard />} />
+          <Route path="activities" element={<ActivityLoggingPage />} />
+          <Route path="history" element={<ActivityLoggingPage />} />
+          <Route path="reports" element={<ReportsAnalyticsPage />} />
+          <Route path="profile" element={<MyProfilePage />} />
+          <Route path="alerts" element={<AlertHistoryPage />} />
+          <Route path="goals" element={<GoalsPage />} />
+          <Route path="recommendations" element={<RecommendationsPage />} />
+          <Route path="articles" element={<ArticlesPage />} />
+          <Route path="articles/:id" element={<ArticlesPage />} />
+        </Route>
 
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+      <ChatbotWidget />
+    </>
   );
 }
 

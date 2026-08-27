@@ -62,10 +62,12 @@ public class UserServiceImpl implements UserService {
         user.setAge(request.getAge());
         user.setGender(request.getGender());
         user.setDateOfBirth(request.getDateOfBirth());
-        user.setMobileNumber(request.getMobileNumber().trim());
+        user.setMobileNumber(normalizeOptional(request.getMobileNumber()));
         user.setAlternateMobile(normalizeOptional(request.getAlternateMobile()));
         user.setEmail(email);
-        updateAddress(user, request.getAddress());
+        if (request.getAddress() != null) {
+            updateAddress(user, request.getAddress());
+        }
         return userMapper.toDetailDto(userRepository.save(user));
     }
 
@@ -101,14 +103,14 @@ public class UserServiceImpl implements UserService {
     private void updateAddress(User user, AddressDto dto) {
         Address address = user.getAddress();
         if (address == null) { address = new Address(); user.setAddress(address); }
-        address.setHouseNumber(dto.getHouseNumber().trim());
-        address.setStreet(dto.getStreet().trim());
-        address.setArea(dto.getArea().trim());
+        address.setHouseNumber(normalizeOptional(dto.getHouseNumber()));
+        address.setStreet(normalizeOptional(dto.getStreet()));
+        address.setArea(normalizeOptional(dto.getArea()));
         address.setLandmark(normalizeOptional(dto.getLandmark()));
-        address.setCity(dto.getCity().trim());
-        address.setState(dto.getState().trim());
-        address.setCountry(dto.getCountry().trim());
-        address.setPinCode(dto.getPinCode().trim());
+        address.setCity(normalizeOptional(dto.getCity()));
+        address.setState(normalizeOptional(dto.getState()));
+        address.setCountry(normalizeOptional(dto.getCountry()));
+        address.setPinCode(normalizeOptional(dto.getPinCode()));
     }
 
     private String normalizeOptional(String value) { return value == null || value.isBlank() ? null : value.trim(); }

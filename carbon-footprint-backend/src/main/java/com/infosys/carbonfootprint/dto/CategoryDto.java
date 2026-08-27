@@ -1,6 +1,7 @@
 package com.infosys.carbonfootprint.dto;
 
 import com.infosys.carbonfootprint.entity.CategoryStatus;
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
@@ -26,6 +27,7 @@ public class CategoryDto {
     private String description;
 
     private String icon;
+    private String image;
     private String colorCode;
     private Integer displayOrder;
 
@@ -33,6 +35,10 @@ public class CategoryDto {
     private CategoryStatus status;
 
     private String remarks;
+
+    @DecimalMin(value = "0.01", message = "Monthly emission limit must be a positive number")
+    private Double monthlyLimit;
+
     private String createdBy;
     private String updatedBy;
     private LocalDateTime createdAt;

@@ -47,17 +47,15 @@ public class User {
     @Column(name = "last_name", nullable = false)
     private String lastName;
 
-    @Column(nullable = false)
     private Integer age;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
     private Gender gender;
 
-    @Column(name = "date_of_birth", nullable = false)
+    @Column(name = "date_of_birth")
     private LocalDate dateOfBirth;
 
-    @Column(name = "mobile_number", nullable = false)
+    @Column(name = "mobile_number")
     private String mobileNumber;
 
     @Column(name = "alternate_mobile")

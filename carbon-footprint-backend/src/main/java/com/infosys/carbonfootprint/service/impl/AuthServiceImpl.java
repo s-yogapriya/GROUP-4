@@ -11,7 +11,12 @@ import com.infosys.carbonfootprint.repository.UserRepository;
 import com.infosys.carbonfootprint.security.UserDetailsImpl;
 import com.infosys.carbonfootprint.security.jwt.JwtUtils;
 import com.infosys.carbonfootprint.service.AuthService;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
+import com.google.api.client.http.javanet.NetHttpTransport;
+import com.google.api.client.json.gson.GsonFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -21,9 +26,12 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -46,6 +54,9 @@ public class AuthServiceImpl implements AuthService {
 
     @Autowired
     private UserMapper userMapper;
+
+    @Value("${app.google.client-id}")
+    private String googleClientId;
 
     @Override
     @Transactional
@@ -118,6 +129,88 @@ public class AuthServiceImpl implements AuthService {
                 .firstLogin(user.isFirstLogin())
                 .roles(roles)
                 .build();
+    }
+
+    @Override
+    @Transactional
+    public JwtResponse authenticateGoogle(GoogleLoginRequest request) {
+        GoogleIdToken idToken = verifyGoogleToken(request.getCredential());
+        if (idToken == null) {
+            throw new AppAuthenticationException("Invalid Google authentication token");
+        }
+
+        GoogleIdToken.Payload payload = idToken.getPayload();
+        String email = payload.getEmail();
+        String googleId = payload.getSubject();
+        String firstName = (String) payload.getOrDefault("given_name", "");
+        String lastName = (String) payload.getOrDefault("family_name", "");
+
+        // Check if user already exists by email
+        User user = userRepository.findByEmail(email).orElse(null);
+
+        if (user == null) {
+            // Auto-create new user with APPROVED status (no admin approval needed for Google users)
+            Role userRole = roleRepository.findByName(RoleType.ROLE_USER)
+                    .orElseGet(() -> roleRepository.save(Role.builder().name(RoleType.ROLE_USER).build()));
+
+            Set<Role> roles = new HashSet<>();
+            roles.add(userRole);
+
+            user = User.builder()
+                    .email(email)
+                    .username("google_" + googleId)
+                    .password(passwordEncoder.encode(UUID.randomUUID().toString()))
+                    .firstName(firstName.isEmpty() ? "Google" : firstName)
+                    .lastName(lastName.isEmpty() ? "User" : lastName)
+                    .status(UserStatus.APPROVED)
+                    .firstLogin(false)
+                    .roles(roles)
+                    .build();
+
+            user = userRepository.save(user);
+        } else {
+            // If user exists but was PENDING or REJECTED via normal registration, approve them
+            if (user.getStatus() != UserStatus.APPROVED) {
+                user.setStatus(UserStatus.APPROVED);
+                user.setFirstLogin(false);
+                user = userRepository.save(user);
+            }
+        }
+
+        // Generate JWT using a manually created authentication
+        UserDetailsImpl userDetails = UserDetailsImpl.build(user);
+        Authentication authentication = new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+
+        String jwt = jwtUtils.generateJwtToken(authentication);
+
+        List<String> roles = userDetails.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .collect(Collectors.toList());
+
+        return JwtResponse.builder()
+                .token(jwt)
+                .type("Bearer")
+                .id(userDetails.getId())
+                .username(userDetails.getUsername())
+                .email(userDetails.getEmail())
+                .firstName(userDetails.getFirstName())
+                .lastName(userDetails.getLastName())
+                .firstLogin(false)
+                .roles(roles)
+                .build();
+    }
+
+    private GoogleIdToken verifyGoogleToken(String idTokenString) {
+        try {
+            GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(
+                    new NetHttpTransport(), GsonFactory.getDefaultInstance())
+                    .setAudience(Collections.singletonList(googleClientId))
+                    .build();
+            return verifier.verify(idTokenString);
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     @Override

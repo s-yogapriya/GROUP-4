@@ -33,11 +33,53 @@ public class UserDashboardServiceImpl implements UserDashboardService {
     @Override
     @Transactional(readOnly = true)
     public UserDashboardSummaryDto getSummary(Long userId) {
-        long totalDays = activityLogRepo.countDistinctActivityDatesByUserId(userId);
-        boolean hasActivities = totalDays > 0;
+        return getSummary(userId, "ALL");
+    }
 
-        int streak = hasActivities ? calculateStreak(userId) : 0;
-        int score = hasActivities ? calculateScore(userId) : 0;
+    @Override
+    @Transactional(readOnly = true)
+    public UserDashboardSummaryDto getSummary(Long userId, String period) {
+        if (period == null) period = "ALL";
+        LocalDate today = LocalDate.now();
+
+        LocalDate rangeStart;
+        LocalDate rangeEnd;
+        switch (period.toUpperCase()) {
+            case "DAY":
+                rangeStart = today;
+                rangeEnd = today;
+                break;
+            case "MONTH":
+                rangeStart = today.withDayOfMonth(1);
+                rangeEnd = today.withDayOfMonth(today.lengthOfMonth());
+                break;
+            case "YEAR":
+                rangeStart = today.withDayOfYear(1);
+                rangeEnd = today.withDayOfYear(today.lengthOfYear());
+                break;
+            default: // ALL
+                rangeStart = null;
+                rangeEnd = null;
+        }
+
+        boolean hasActivities;
+        int streak;
+        int score;
+
+        if (rangeStart == null) {
+            // ALL — use original behavior
+            long totalDays = activityLogRepo.countDistinctActivityDatesByUserId(userId);
+            hasActivities = totalDays > 0;
+            streak = hasActivities ? calculateStreakAll(userId) : 0;
+            score = hasActivities ? calculateScoreAll(userId) : 0;
+        } else {
+            List<LocalDate> datesInRange = activityLogRepo.findByUserIdAndDateRange(userId, rangeStart, rangeEnd)
+                    .stream().map(a -> a.getActivityDate()).distinct().sorted((a, b) -> b.compareTo(a)).toList();
+            hasActivities = !datesInRange.isEmpty();
+            streak = hasActivities ? calculateStreakInRange(datesInRange, today) : 0;
+            score = hasActivities ? calculateScoreInRange(userId, rangeStart, rangeEnd, today) : 0;
+        }
+
         String status = scoreStatus(score);
 
         return UserDashboardSummaryDto.builder()
@@ -48,22 +90,17 @@ public class UserDashboardServiceImpl implements UserDashboardService {
                 .build();
     }
 
-    // ── Streak ────────────────────────────────────────────────────────────────
-    // Uses LocalDate arithmetic only — no timezone conversion, no timestamps.
-    // Counts consecutive calendar days ending at today or yesterday.
-    private int calculateStreak(Long userId) {
+    // ── Streak (all-time) ──────────────────────────────────────────────────
+    private int calculateStreakAll(Long userId) {
         List<LocalDate> dates = activityLogRepo.findDistinctActivityDatesByUserId(userId);
         if (dates.isEmpty()) return 0;
 
         LocalDate today = LocalDate.now();
-        LocalDate mostRecent = dates.get(0); // already sorted DESC
+        LocalDate mostRecent = dates.get(0);
 
-        // If the most recent activity is older than yesterday, streak is 0
-        // (user hasn't logged today or yesterday — streak has broken)
         long gapFromToday = today.toEpochDay() - mostRecent.toEpochDay();
         if (gapFromToday > 1) return 0;
 
-        // Walk backwards through sorted dates counting consecutive days
         int streak = 0;
         LocalDate expected = mostRecent;
         for (LocalDate date : dates) {
@@ -71,17 +108,34 @@ public class UserDashboardServiceImpl implements UserDashboardService {
                 streak++;
                 expected = expected.minusDays(1);
             } else {
-                break; // gap found — streak ends
+                break;
             }
         }
         return streak;
     }
 
-    // ── Sustainability Score ──────────────────────────────────────────────────
-    // Priority 1: use the user's monthly goal if one exists for this month.
-    // Priority 2: fall back to sum of all active category emission limits.
-    // Score = clamp(100 - (currentEmission / target * 100), 0, 100)
-    private int calculateScore(Long userId) {
+    // ── Streak (within a date range) ───────────────────────────────────────
+    private int calculateStreakInRange(List<LocalDate> sortedDatesDesc, LocalDate today) {
+        if (sortedDatesDesc.isEmpty()) return 0;
+        LocalDate mostRecent = sortedDatesDesc.get(0);
+        long gapFromToday = today.toEpochDay() - mostRecent.toEpochDay();
+        if (gapFromToday > 1) return 0;
+
+        int streak = 0;
+        LocalDate expected = mostRecent;
+        for (LocalDate date : sortedDatesDesc) {
+            if (date.toEpochDay() == expected.toEpochDay()) {
+                streak++;
+                expected = expected.minusDays(1);
+            } else {
+                break;
+            }
+        }
+        return streak;
+    }
+
+    // ── Score (all-time) ───────────────────────────────────────────────────
+    private int calculateScoreAll(Long userId) {
         LocalDate today = LocalDate.now();
         YearMonth current = YearMonth.now();
         LocalDate monthStart = current.atDay(1);
@@ -89,7 +143,6 @@ public class UserDashboardServiceImpl implements UserDashboardService {
 
         double currentEmission = activityLogRepo.sumEmissionByUserIdAndDateRange(userId, monthStart, monthEnd);
 
-        // Try monthly goal first
         Optional<Goal> goalOpt = goalRepo.findByUserIdAndMonthAndYear(userId, today.getMonthValue(), today.getYear());
         if (goalOpt.isPresent()) {
             double target = goalOpt.get().getTargetAmount();
@@ -99,10 +152,8 @@ public class UserDashboardServiceImpl implements UserDashboardService {
             }
         }
 
-        // Fall back to sum of active emission limits across all categories
         List<EmissionLimit> limits = emissionLimitRepo.findAll().stream()
-                .filter(EmissionLimit::isActive)
-                .toList();
+                .filter(EmissionLimit::isActive).toList();
         if (!limits.isEmpty()) {
             double totalLimit = limits.stream().mapToDouble(EmissionLimit::getMonthlyLimit).sum();
             if (totalLimit > 0) {
@@ -111,9 +162,33 @@ public class UserDashboardServiceImpl implements UserDashboardService {
             }
         }
 
-        // No goal and no limits configured — score based on absolute emission magnitude.
-        // Use a simple heuristic: 0 kg = 100, 50 kg = 0 (linear).
         return (int) Math.max(0, Math.min(100, Math.round(100 - currentEmission * 2)));
+    }
+
+    // ── Score (within a date range) ────────────────────────────────────────
+    private int calculateScoreInRange(Long userId, LocalDate from, LocalDate to, LocalDate today) {
+        double periodEmission = activityLogRepo.sumEmissionByUserIdAndDateRange(userId, from, to);
+
+        Optional<Goal> goalOpt = goalRepo.findByUserIdAndMonthAndYear(userId, today.getMonthValue(), today.getYear());
+        if (goalOpt.isPresent()) {
+            double target = goalOpt.get().getTargetAmount();
+            if (target > 0) {
+                double ratio = periodEmission / target;
+                return (int) Math.max(0, Math.min(100, Math.round(100 - ratio * 100)));
+            }
+        }
+
+        List<EmissionLimit> limits = emissionLimitRepo.findAll().stream()
+                .filter(EmissionLimit::isActive).toList();
+        if (!limits.isEmpty()) {
+            double totalLimit = limits.stream().mapToDouble(EmissionLimit::getMonthlyLimit).sum();
+            if (totalLimit > 0) {
+                double ratio = periodEmission / totalLimit;
+                return (int) Math.max(0, Math.min(100, Math.round(100 - ratio * 100)));
+            }
+        }
+
+        return (int) Math.max(0, Math.min(100, Math.round(100 - periodEmission * 2)));
     }
 
     private String scoreStatus(int score) {
