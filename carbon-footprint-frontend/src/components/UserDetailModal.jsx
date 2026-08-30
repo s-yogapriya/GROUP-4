@@ -1,13 +1,18 @@
-import React from 'react';
-import { X, User, MapPin, FileCheck, Calendar, Phone, Mail, CheckCircle2, XCircle } from 'lucide-react';
+import React, { useState } from 'react';
+import { X, User, MapPin, FileCheck, CheckCircle2, XCircle, Eye, EyeOff } from 'lucide-react';
 
 const UserDetailModal = ({ user, onClose, onApprove, onReject }) => {
+  const [showDoc, setShowDoc] = useState(false);
   if (!user) return null;
+
+  const docUrl = user.governmentId?.documentUrl;
+  const isPdf = docUrl?.toLowerCase().endsWith('.pdf');
+  const fullDocUrl = docUrl ? (docUrl.startsWith('http') ? docUrl : docUrl) : null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm overflow-y-auto">
       <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-200">
-        
+
         {/* Header */}
         <div className="px-6 py-4 bg-slate-800/80 border-b border-slate-700/60 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -36,7 +41,7 @@ const UserDetailModal = ({ user, onClose, onApprove, onReject }) => {
 
         {/* Content Body */}
         <div className="p-6 space-y-6 max-h-[75vh] overflow-y-auto">
-          
+
           {/* Personal Info */}
           <div>
             <h4 className="text-xs font-bold text-emerald-400 uppercase tracking-wider mb-3 flex items-center gap-2">
@@ -84,7 +89,8 @@ const UserDetailModal = ({ user, onClose, onApprove, onReject }) => {
                   <p className="text-slate-400">Landmark: {user.address.landmark}</p>
                 )}
                 <p className="text-slate-400">
-                  {user.address.city}, {user.address.state}, {user.address.country} - <span className="text-emerald-400 font-mono">{user.address.pinCode}</span>
+                  {user.address.city}, {user.address.state}, {user.address.country} -{' '}
+                  <span className="text-emerald-400 font-mono">{user.address.pinCode}</span>
                 </p>
               </div>
             </div>
@@ -96,15 +102,54 @@ const UserDetailModal = ({ user, onClose, onApprove, onReject }) => {
               <h4 className="text-xs font-bold text-emerald-400 uppercase tracking-wider mb-3 flex items-center gap-2">
                 <FileCheck className="w-4 h-4" /> Government Identity Verification
               </h4>
-              <div className="bg-slate-950/50 p-4 rounded-xl border border-slate-800/60 flex items-center justify-between text-xs">
-                <div>
-                  <span className="text-slate-500 block">Document Type</span>
-                  <span className="text-white font-bold text-sm">{user.governmentId.idType}</span>
+              <div className="bg-slate-950/50 p-4 rounded-xl border border-slate-800/60 space-y-3 text-xs">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-slate-500 block">Document Type</span>
+                    <span className="text-white font-bold text-sm">{user.governmentId.idType}</span>
+                  </div>
+                  {fullDocUrl && (
+                    <button
+                      onClick={() => setShowDoc((v) => !v)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-semibold transition-all"
+                    >
+                      {showDoc ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                      {showDoc ? 'Hide Document' : 'View Document'}
+                    </button>
+                  )}
+                  {!fullDocUrl && (
+                    <span className="text-slate-500 text-xs italic">No document uploaded</span>
+                  )}
                 </div>
-                <div>
-                  <span className="text-slate-500 block">Document ID Number</span>
-                  <span className="text-emerald-400 font-mono font-bold text-sm tracking-wider">{user.governmentId.idNumber}</span>
-                </div>
+
+                {/* Document Preview */}
+                {showDoc && fullDocUrl && (
+                  <div className="mt-2 rounded-xl overflow-hidden border border-slate-700">
+                    {isPdf ? (
+                      <iframe
+                        src={fullDocUrl}
+                        title="Government ID Document"
+                        className="w-full h-72 bg-white"
+                      />
+                    ) : (
+                      <img
+                        src={fullDocUrl}
+                        alt="Government ID Document"
+                        className="w-full max-h-72 object-contain bg-slate-950"
+                      />
+                    )}
+                    <div className="px-3 py-2 bg-slate-900 border-t border-slate-800 flex justify-end">
+                      <a
+                        href={fullDocUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-emerald-400 hover:underline"
+                      >
+                        Open in new tab ↗
+                      </a>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -119,7 +164,7 @@ const UserDetailModal = ({ user, onClose, onApprove, onReject }) => {
           >
             Close
           </button>
-          
+
           {user.status === 'PENDING' && (
             <div className="flex items-center gap-3">
               <button

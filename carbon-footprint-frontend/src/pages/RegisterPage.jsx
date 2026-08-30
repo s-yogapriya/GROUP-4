@@ -116,15 +116,20 @@ const RegisterPage = () => {
     data.append('file', file);
     try {
       const res = await api.post('/public/upload-document', data, {
-        headers: { 'Content-Type': 'multipart/form-data' },
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
       });
+      const docUrl = typeof res === 'string' ? res : (res?.data || res);
       setFormData((prev) => ({
         ...prev,
-        governmentId: { ...prev.governmentId, documentUrl: res.data },
+        governmentId: { ...prev.governmentId, documentUrl: docUrl },
       }));
       setUploadedFileName(file.name);
-    } catch {
-      setFieldErrors((prev) => ({ ...prev, 'governmentId.documentUrl': 'Upload failed. Please try again.' }));
+    } catch (err) {
+      console.error('Document upload error:', err);
+      const errorMsg = typeof err === 'string' ? err : (err?.response?.data?.message || 'Upload failed. Please try again.');
+      setFieldErrors((prev) => ({ ...prev, 'governmentId.documentUrl': errorMsg }));
     } finally {
       setUploading(false);
     }

@@ -1,36 +1,34 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
-import Footer from '../components/Footer';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
-import { KeyRound, Lock, CheckCircle, AlertCircle, ShieldAlert } from 'lucide-react';
+import { Lock, AlertCircle, ShieldAlert, Eye, EyeOff } from 'lucide-react';
 
 const ResetPasswordPage = () => {
   const navigate = useNavigate();
   const { user, updateUser, showToast } = useAuth();
 
-  const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [showNew, setShowNew] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!oldPassword.trim() || !newPassword.trim() || !confirmPassword.trim()) {
-      setErrorMessage('All password fields are required');
+    if (!newPassword.trim() || !confirmPassword.trim()) {
+      setErrorMessage('All fields are required');
       return;
     }
-
     if (newPassword !== confirmPassword) {
-      setErrorMessage('New password and confirm password do not match');
+      setErrorMessage('Passwords do not match');
       return;
     }
-
     if (newPassword.length < 8) {
-      setErrorMessage('New password must be at least 8 characters long');
+      setErrorMessage('Password must be at least 8 characters');
       return;
     }
 
@@ -39,11 +37,10 @@ const ResetPasswordPage = () => {
 
     try {
       await api.post(`/auth/reset-password/${user.id}`, {
-        oldPassword,
+        oldPassword: '',
         newPassword,
         confirmPassword,
       });
-
       updateUser({ firstLogin: false });
       showToast('Password updated successfully! Welcome to your dashboard.', 'success');
       navigate('/user/dashboard');
@@ -60,14 +57,14 @@ const ResetPasswordPage = () => {
 
       <main className="flex-1 flex items-center justify-center px-4 py-16">
         <div className="w-full max-w-md space-y-6">
-          
+
           <div className="text-center space-y-2">
             <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 mx-auto animate-pulse">
               <ShieldAlert className="w-6 h-6" />
             </div>
-            <h1 className="text-2xl font-extrabold text-white">First Login: Security Password Reset</h1>
+            <h1 className="text-2xl font-extrabold text-white">Set Your New Password</h1>
             <p className="text-xs text-slate-400">
-              For security compliance, you must replace your temporary password before proceeding.
+              Create a secure password to access your dashboard.
             </p>
           </div>
 
@@ -80,34 +77,22 @@ const ResetPasswordPage = () => {
 
           <div className="glass-card p-6 sm:p-8 rounded-2xl border border-slate-800 shadow-2xl">
             <form onSubmit={handleSubmit} className="space-y-4">
-              
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1.5">Temporary Password (From Email)</label>
-                <div className="relative">
-                  <KeyRound className="w-4 h-4 text-slate-500 absolute left-3.5 top-3" />
-                  <input
-                    type="password"
-                    value={oldPassword}
-                    onChange={(e) => setOldPassword(e.target.value)}
-                    placeholder="Enter temporary password"
-                    className="w-full pl-10 pr-4 py-2.5 rounded-lg bg-slate-950 border border-slate-800 focus:border-emerald-500 text-sm text-white outline-none"
-                    required
-                  />
-                </div>
-              </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1.5">New Secure Password</label>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5">New Password</label>
                 <div className="relative">
                   <Lock className="w-4 h-4 text-slate-500 absolute left-3.5 top-3" />
                   <input
-                    type="password"
+                    type={showNew ? 'text' : 'password'}
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                     placeholder="Minimum 8 characters"
-                    className="w-full pl-10 pr-4 py-2.5 rounded-lg bg-slate-950 border border-slate-800 focus:border-emerald-500 text-sm text-white outline-none"
+                    className="w-full pl-10 pr-10 py-2.5 rounded-lg bg-slate-950 border border-slate-800 focus:border-emerald-500 text-sm text-white outline-none"
                     required
                   />
+                  <button type="button" onClick={() => setShowNew((v) => !v)} className="absolute right-3 top-2.5 text-slate-500 hover:text-slate-300">
+                    {showNew ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
                 </div>
               </div>
 
@@ -116,13 +101,16 @@ const ResetPasswordPage = () => {
                 <div className="relative">
                   <Lock className="w-4 h-4 text-slate-500 absolute left-3.5 top-3" />
                   <input
-                    type="password"
+                    type={showConfirm ? 'text' : 'password'}
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     placeholder="Re-enter new password"
-                    className="w-full pl-10 pr-4 py-2.5 rounded-lg bg-slate-950 border border-slate-800 focus:border-emerald-500 text-sm text-white outline-none"
+                    className="w-full pl-10 pr-10 py-2.5 rounded-lg bg-slate-950 border border-slate-800 focus:border-emerald-500 text-sm text-white outline-none"
                     required
                   />
+                  <button type="button" onClick={() => setShowConfirm((v) => !v)} className="absolute right-3 top-2.5 text-slate-500 hover:text-slate-300">
+                    {showConfirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
                 </div>
               </div>
 
@@ -131,7 +119,7 @@ const ResetPasswordPage = () => {
                 disabled={loading}
                 className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-bold text-sm shadow-lg shadow-emerald-950/40 transition-all disabled:opacity-50 mt-2"
               >
-                {loading ? 'Updating Password...' : 'Save New Password & Continue'}
+                {loading ? 'Updating Password...' : 'Save Password & Continue'}
               </button>
 
             </form>
@@ -139,8 +127,6 @@ const ResetPasswordPage = () => {
 
         </div>
       </main>
-
-      <Footer />
     </div>
   );
 };

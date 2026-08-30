@@ -36,19 +36,7 @@ const Footer = () => {
               <li><a href="/register" className="hover:text-emerald-400 transition-colors">Register Account</a></li>
             </ul>
           </div>
-
-          {/* Technology Stack
-          <div>
-            <h4 className="text-white font-semibold mb-4 text-sm">Technology Stack</h4>
-            <ul className="space-y-2 text-xs">
-              <li>Java 21 & Spring Boot 3</li>
-              <li>Spring Security & JWT</li>
-              <li>PostgreSQL (3NF Database)</li>
-              <li>React + Vite + Tailwind CSS</li>
-              <li>Recharts & Lucide Icons</li>
-            </ul>
-          </div> */}
-
+          
           {/* Contact Information */}
           <div>
             <h4 className="text-white font-semibold mb-4 text-sm">Contact Support</h4>
