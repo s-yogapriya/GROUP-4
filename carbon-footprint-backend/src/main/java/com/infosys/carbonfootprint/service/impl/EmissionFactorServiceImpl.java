@@ -13,6 +13,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import java.util.stream.Collectors;
 
 @Service
@@ -50,6 +52,21 @@ public class EmissionFactorServiceImpl implements EmissionFactorService {
     public List<EmissionFactorDto> getAll() {
         return emissionFactorRepository.findAllByOrderByCreatedAtDesc()
                 .stream().map(this::toDto).collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<EmissionFactorDto> getPage(Pageable pageable) {
+        return emissionFactorRepository.findAll(pageable).map(this::toDto);
+    }
+
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<EmissionFactorDto> getFilteredPage(Long activityTypeId, Long categoryId, com.infosys.carbonfootprint.entity.CategoryStatus status, String search, Pageable pageable) {
+        String normalizedSearch = (search == null || search.isBlank()) ? null : search.trim();
+        return emissionFactorRepository.searchPage(activityTypeId, categoryId, status, normalizedSearch, pageable)
+                .map(this::toDto);
     }
 
     @Override

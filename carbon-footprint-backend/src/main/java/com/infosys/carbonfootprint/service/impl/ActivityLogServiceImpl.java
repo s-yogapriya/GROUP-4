@@ -14,6 +14,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.List;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import java.util.stream.Collectors;
 
 @Service
@@ -60,6 +62,7 @@ public class ActivityLogServiceImpl implements ActivityLogService {
                 .unit(activityType.getUnit())
                 .emissionFactor(ef.getEmissionFactor())
                 .totalEmission(totalEmission)
+                .emissionKg(totalEmission)
                 .activityDate(dto.getActivityDate())
                 .notes(dto.getNotes())
                 .build();
@@ -81,6 +84,18 @@ public class ActivityLogServiceImpl implements ActivityLogService {
     public List<ActivityLogDto> getAllForAdmin() {
         return activityLogRepository.findAllByOrderByActivityDateDescCreatedAtDesc()
                 .stream().map(this::toDto).collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<ActivityLogDto> getPageByUser(Long userId, Pageable pageable) {
+        return activityLogRepository.findByUserId(userId, pageable).map(this::toDto);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<ActivityLogDto> getPageForAdmin(Pageable pageable) {
+        return activityLogRepository.findAll(pageable).map(this::toDto);
     }
 
     @Override
@@ -116,6 +131,7 @@ public class ActivityLogServiceImpl implements ActivityLogService {
         log.setUnit(activityType.getUnit());
         log.setEmissionFactor(ef.getEmissionFactor());
         log.setTotalEmission(totalEmission);
+        log.setEmissionKg(totalEmission);
         log.setActivityDate(dto.getActivityDate());
         log.setNotes(dto.getNotes());
 

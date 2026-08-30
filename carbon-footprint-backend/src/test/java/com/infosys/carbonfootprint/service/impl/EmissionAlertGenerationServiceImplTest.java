@@ -39,9 +39,9 @@ class EmissionAlertGenerationServiceImplTest {
 
         service.checkCurrentMonthlyGoal(7L);
         assertEquals(1, stored.size());
-        assertFalse(stored.getFirst().isRead());
-        assertEquals(2.0, stored.getFirst().getMonthlyLimit());
-        assertEquals(3.94, stored.getFirst().getExceededAmount(), 0.0001);
+        assertFalse(stored.get(0).isRead());
+        assertEquals(2.0, stored.get(0).getMonthlyLimit());
+        assertEquals(3.94, stored.get(0).getExceededAmount(), 0.0001);
 
         goal.setTargetAmount(10.0);
         service.checkCurrentMonthlyGoal(7L);

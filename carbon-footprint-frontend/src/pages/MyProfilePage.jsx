@@ -4,7 +4,7 @@ import { Edit3, Save, Upload, UserRound, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const text = (value) => value || 'Not provided';
-const photoSource = (url) => url && (url.startsWith('http') ? url : `http://localhost:8080${url}`);
+const photoSource = (url) => url && (url.startsWith('http') ? url : `http://localhost:8088${url}`);
 const emptyAddress = { houseNumber: '', street: '', area: '', landmark: '', city: '', state: '', country: '', pinCode: '' };
 
 export default function MyProfilePage() {

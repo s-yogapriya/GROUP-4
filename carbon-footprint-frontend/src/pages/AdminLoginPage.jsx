@@ -10,7 +10,7 @@ const AdminLoginPage = () => {
   const navigate = useNavigate();
   const { login, showToast } = useAuth();
 
-  const [email, setEmail] = useState('jkjstech25@gmail.com');
+  const [email, setEmail] = useState('admin@infosys.com');
   const [password, setPassword] = useState('admin123');
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -63,7 +63,7 @@ const AdminLoginPage = () => {
             <Info className="w-4 h-4 text-teal-400 shrink-0 mt-0.5" />
             <div>
               <p className="font-semibold text-white">Default Admin Credentials (Seeded):</p>
-              <p className="font-mono text-teal-300 mt-0.5">Email: jkjstech25@gmail.com</p>
+              <p className="font-mono text-teal-300 mt-0.5">Email: admin@infosys.com</p>
               <p className="font-mono text-teal-300">Password: admin123</p>
             </div>
           </div>

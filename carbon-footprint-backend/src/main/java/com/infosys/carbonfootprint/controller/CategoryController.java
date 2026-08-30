@@ -15,6 +15,10 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 
 @RestController
 @RequestMapping("/api/v1/admin/categories")
@@ -44,6 +48,13 @@ public class CategoryController {
     @GetMapping
     public ResponseEntity<ApiResponse<List<CategoryDto>>> getAll() {
         return ResponseEntity.ok(ApiResponse.success("Categories fetched", categoryService.getAll()));
+    }
+
+    @GetMapping("/page")
+    public ResponseEntity<ApiResponse<Page<CategoryDto>>> getPage(@RequestParam(defaultValue="0") int page, @RequestParam(defaultValue="5") int size) {
+        int safeSize = List.of(5,10,15,20,50).contains(size) ? size : 5;
+        Pageable pageable = PageRequest.of(Math.max(0,page), safeSize, Sort.by("displayOrder").ascending().and(Sort.by("categoryName").ascending()));
+        return ResponseEntity.ok(ApiResponse.success("Categories page fetched", categoryService.getPage(pageable)));
     }
 
     @GetMapping("/{id}")

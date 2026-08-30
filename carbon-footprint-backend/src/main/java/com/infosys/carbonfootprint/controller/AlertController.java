@@ -8,7 +8,7 @@ import com.infosys.carbonfootprint.service.EmissionAlertGenerationService;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import java.util.*;
+import java.util.*; import org.springframework.data.domain.Page; import org.springframework.data.domain.PageRequest; import org.springframework.data.domain.Pageable; import org.springframework.data.domain.Sort;
 
 @RestController
 @RequestMapping("/api/v1/user/alerts")
@@ -23,6 +23,9 @@ public class AlertController {
         alertGenerationService.checkCurrentMonthlyGoal(user.getId());
         return ApiResponse.success("Alerts fetched", service.getAll(user.getId()));
     }
+
+    @GetMapping("/page")
+    public ApiResponse<Page<AlertDto>> page(@AuthenticationPrincipal UserDetailsImpl user,@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="5") int size){int safeSize=List.of(5,10,15,20,50).contains(size)?size:5; Pageable p=PageRequest.of(Math.max(0,page),safeSize,Sort.by("createdAt").descending()); alertGenerationService.checkCurrentMonthlyGoal(user.getId()); return ApiResponse.success("Alerts page fetched",service.getPage(user.getId(),p));}
 
     @GetMapping("/current-goal")
     public ApiResponse<AlertDto> currentGoal(@AuthenticationPrincipal UserDetailsImpl user) {

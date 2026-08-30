@@ -15,6 +15,10 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
 import java.util.List;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 
 @RestController
 @RequestMapping("/api/v1/user/activities")
@@ -36,6 +40,13 @@ public class ActivityLogController {
             @AuthenticationPrincipal UserDetailsImpl user) {
         return ResponseEntity.ok(ApiResponse.success("Activities fetched",
                 activityLogService.getByUser(user.getId())));
+    }
+
+    @GetMapping("/page")
+    public ResponseEntity<ApiResponse<Page<ActivityLogDto>>> getPage(@AuthenticationPrincipal UserDetailsImpl user, @RequestParam(defaultValue="0") int page, @RequestParam(defaultValue="5") int size) {
+        int safeSize = List.of(5,10,15,20,50).contains(size) ? size : 5;
+        Pageable pageable = PageRequest.of(Math.max(0,page), safeSize, Sort.by("activityDate").descending().and(Sort.by("createdAt").descending()));
+        return ResponseEntity.ok(ApiResponse.success("Activities page fetched", activityLogService.getPageByUser(user.getId(), pageable)));
     }
 
     @GetMapping("/{id}")

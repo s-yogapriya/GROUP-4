@@ -4,6 +4,8 @@ import com.infosys.carbonfootprint.entity.ActivityLog;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -14,6 +16,8 @@ public interface ActivityLogRepository extends JpaRepository<ActivityLog, Long> 
     List<ActivityLog> findAllByOrderByActivityDateDescCreatedAtDesc();
 
     List<ActivityLog> findByUserIdOrderByActivityDateDescCreatedAtDesc(Long userId);
+
+    Page<ActivityLog> findByUserId(Long userId, Pageable pageable);
 
     Optional<ActivityLog> findByActivityLogIdAndUserId(Long logId, Long userId);
 
@@ -60,4 +64,7 @@ public interface ActivityLogRepository extends JpaRepository<ActivityLog, Long> 
            @Param("categoryId") Long categoryId,
            @Param("fromDate") LocalDate fromDate,
            @Param("toDate") LocalDate toDate);
+
+    @Query("SELECT COUNT(a) > 0 FROM ActivityLog a WHERE a.user.id = :userId AND a.notes = :notes")
+    boolean existsByUserIdAndNotes(@Param("userId") Long userId, @Param("notes") String notes);
 }

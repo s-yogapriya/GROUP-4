@@ -24,6 +24,7 @@ import AdminEmissionLimitsPage from './pages/AdminEmissionLimitsPage';
 import AdminArticlesPage from './pages/AdminArticlesPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import ChatbotWidget from './components/ChatbotWidget';
+import OAuth2CallbackPage from './pages/OAuth2CallbackPage';
 import { useAuth } from './context/AuthContext';
 
 function PublicOnly({ children }) {
@@ -39,6 +40,7 @@ function App() {
         <Route path="/register" element={<PublicOnly><RegisterPage /></PublicOnly>} />
         <Route path="/login" element={<PublicOnly><UserLoginPage /></PublicOnly>} />
         <Route path="/admin/login" element={<PublicOnly><AdminLoginPage /></PublicOnly>} />
+        <Route path="/oauth2/callback" element={<OAuth2CallbackPage />} />
         <Route path="/reset-password" element={<ProtectedRoute><ResetPasswordPage /></ProtectedRoute>} />
 
         <Route path="/admin" element={<ProtectedRoute requireAdmin={true}><AdminShell /></ProtectedRoute>}>
@@ -50,6 +52,7 @@ function App() {
           <Route path="activity-logs" element={<AdminActivityLogsPage />} />
           <Route path="emission-limits" element={<AdminEmissionLimitsPage />} />
           <Route path="articles" element={<AdminArticlesPage />} />
+          <Route path="profile" element={<MyProfilePage />} />
         </Route>
 
         <Route path="/user" element={<ProtectedRoute><UserShell /></ProtectedRoute>}>

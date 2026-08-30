@@ -1,5 +1,7 @@
 package com.infosys.carbonfootprint.service.impl;
 import com.infosys.carbonfootprint.dto.*; import com.infosys.carbonfootprint.entity.*; import com.infosys.carbonfootprint.exception.ResourceNotFoundException; import com.infosys.carbonfootprint.repository.ArticleRepository; import com.infosys.carbonfootprint.service.ArticleService; import org.springframework.beans.factory.annotation.Value; import org.springframework.stereotype.Service; import org.springframework.transaction.annotation.Transactional; import org.springframework.web.multipart.MultipartFile; import java.io.IOException; import java.nio.file.*; import java.time.*; import java.util.*;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 @Service public class ArticleServiceImpl implements ArticleService {
 
@@ -16,6 +18,10 @@ import com.infosys.carbonfootprint.dto.*; import com.infosys.carbonfootprint.ent
     private ArticleDto dto(Article a) { return ArticleDto.builder().id(a.getId()).title(a.getTitle()).shortDescription(a.getShortDescription()).content(a.getContent()).category(a.getCategory()).coverImage(a.getCoverImage()).author(a.getAuthor()).status(a.getStatus()).visibleToUsers(a.isVisibleToUsers()).publishedAt(a.getPublishedAt()).createdAt(a.getCreatedAt()).updatedAt(a.getUpdatedAt()).build(); }
 
     public List<ArticleDto> userArticles() { return repo.findByStatusAndVisibleToUsersTrueOrderByPublishedAtDesc(ArticleStatus.PUBLISHED).stream().map(this::dto).toList(); }
+
+    public Page<ArticleDto> userArticlesPage(Pageable pageable) { return repo.findByStatusAndVisibleToUsersTrue(ArticleStatus.PUBLISHED, pageable).map(this::dto); }
+
+    public Page<ArticleDto> adminArticlesPage(Pageable pageable) { return repo.findAllByOrderByUpdatedAtDesc(pageable).map(this::dto); }
 
     public ArticleDto userArticle(Long id) { Article a = repo.findById(id).filter(x -> x.getStatus() == ArticleStatus.PUBLISHED && x.isVisibleToUsers()).orElseThrow(() -> new ResourceNotFoundException("Published article not found")); return dto(a); }
 
@@ -94,5 +100,5 @@ import com.infosys.carbonfootprint.dto.*; import com.infosys.carbonfootprint.ent
 
     @Transactional public ArticleDto publish(Long id) { Article a = repo.findById(id).orElseThrow(() -> new ResourceNotFoundException("Article", "id", id)); a.setStatus(ArticleStatus.PUBLISHED); a.setVisibleToUsers(true); if (a.getPublishedAt() == null) a.setPublishedAt(LocalDateTime.now()); return dto(repo.save(a)); }
 
-    @Transactional public ArticleDto unpublish(Long id) { Article a = repo.findById(id).orElseThrow(() -> new ResourceNotFoundException("Article", "id", id)); a.setStatus(ArticleStatus.HIDDEN); a.setVisibleToUsers(false); return dto(repo.save(a)); }
+    @Transactional public ArticleDto unpublish(Long id) { Article a = repo.findById(id).orElseThrow(() -> new ResourceNotFoundException("Article", "id", id)); a.setStatus(ArticleStatus.UNPUBLISHED); a.setVisibleToUsers(false); return dto(repo.save(a)); }
 }

@@ -1,6 +1,7 @@
 # Vite build output
 dist/
 dist-ssr/
+.vite/
 
 # Node modules
 node_modules/
@@ -9,6 +10,7 @@ node_modules/
 .env
 .env.local
 .env.*.local
+!.env.example
 
 # Logs
 *.log

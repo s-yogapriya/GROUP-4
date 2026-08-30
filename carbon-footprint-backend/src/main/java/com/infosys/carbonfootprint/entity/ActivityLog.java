@@ -46,6 +46,10 @@ public class ActivityLog {
     @Column(name = "total_emission", nullable = false)
     private Double totalEmission;
 
+    // Backward-compatible persisted emission value used by existing database versions.
+    @Column(name = "emission_kg")
+    private Double emissionKg;
+
     @Column(name = "activity_date", nullable = false)
     private LocalDate activityDate;
 

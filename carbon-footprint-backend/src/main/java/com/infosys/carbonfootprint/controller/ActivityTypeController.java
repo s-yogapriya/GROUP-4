@@ -13,6 +13,10 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 
 @RestController
 @RequestMapping("/api/v1/admin/activity-types")
@@ -44,6 +48,16 @@ public class ActivityTypeController {
     public ResponseEntity<ApiResponse<List<ActivityTypeDto>>> getActiveByCategory(@PathVariable Long categoryId) {
         return ResponseEntity.ok(ApiResponse.success("Active activity types fetched",
                 activityTypeService.getActiveByCategoryId(categoryId)));
+    }
+
+    @GetMapping("/page")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<Page<ActivityTypeDto>>> getPage(@RequestParam(defaultValue="0") int page, @RequestParam(defaultValue="5") int size) {
+        int safeSize = List.of(5,10,15,20,50).contains(size) ? size : 5;
+        Pageable pageable = PageRequest.of(Math.max(0,page), safeSize, Sort.by("category.categoryCode").ascending()
+                .and(Sort.by("category.categoryName").ascending())
+                .and(Sort.by("activityName").ascending()));
+        return ResponseEntity.ok(ApiResponse.success("Activity types page fetched", activityTypeService.getPage(pageable)));
     }
 
     @GetMapping("/{id}")

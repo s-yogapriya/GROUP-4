@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../api/axios';
-import { useAuth } from '../context/AuthContext';
 import { RefreshCw, Leaf, CalendarDays, CalendarRange, Activity, Layers, Target, TrendingUp, Flame, ArrowUp, ArrowDown, ArrowRight, Plus } from 'lucide-react';
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend } from 'recharts';
 
@@ -80,7 +79,6 @@ const Chart = ({ title, data, type = 'line' }) => (
 );
 
 export function AnalyticsContent({ reports = false }) {
-  const { showWarning, clearWarnings } = useAuth();
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -90,14 +88,9 @@ export function AnalyticsContent({ reports = false }) {
 
   const load = async () => {
     setLoading(true); setError('');
-    clearWarnings();
     try {
       const r = await api.get('/user/activities');
-      setLogs(r.data || []);
-      if (!reports) {
-        const currentAlert = await api.get('/user/alerts/current-goal');
-        if (currentAlert.data) showWarning(currentAlert.data);
-      }
+      setLogs(Array.isArray(r?.data) ? r.data : []);
     } catch { setError('Unable to load analytics. Please try again.'); }
     finally { setLoading(false); }
   };
@@ -105,14 +98,16 @@ export function AnalyticsContent({ reports = false }) {
   useEffect(() => { load(); }, []);
 
   const loadGoal = useCallback(() => {
-    api.get('/user/goals/current').then(r => setGoal(r.data)).catch(() => {});
+    api.get('/user/goals/current').then(r => setGoal(r?.data || null)).catch(() => setGoal(null));
   }, []);
 
   useEffect(() => { loadGoal(); }, [loadGoal]);
 
   useEffect(() => {
     const p = period.toUpperCase();
-    api.get(`/user/dashboard/summary?period=${p}`).then(r => setSummary(r.data)).catch(() => {});
+    api.get(`/user/dashboard/summary?period=${p}`)
+      .then(r => setSummary(r?.data || null))
+      .catch(() => setSummary(null));
   }, [logs, period]);
 
   const a = useMemo(() => aggregate(logs, period), [logs, period]);
@@ -241,17 +236,17 @@ export function AnalyticsContent({ reports = false }) {
             {/* Monthly Goal — always shows current month */}
             <div className="rounded-2xl border border-slate-700 bg-slate-800/50 p-5">
               <p className="text-xs font-bold uppercase text-slate-400">Monthly Goal</p>
-              {goal ? (
+              {goal && goal.targetAmount > 0 ? (
                 <>
                   <p className="mt-2 font-bold text-white">{kg(a.monthAll)} / {kg(goal.targetAmount)}</p>
                   <div className="mt-2 h-2 overflow-hidden rounded bg-slate-700">
-                    <div className={`h-full ${a.monthAll > goal.targetAmount ? 'bg-rose-400' : 'bg-emerald-400'}`}
-                      style={{ width: `${Math.min(100, a.monthAll / (goal.targetAmount || 1) * 100)}%` }} />
+                    <div className="h-full bg-emerald-400" style={{ width: `${Math.min(100, a.monthAll / goal.targetAmount * 100)}%` }} />
                   </div>
-                  <p className="mt-1 text-xs text-slate-400">
-                    {a.monthAll > goal.targetAmount ? 'Target exceeded' : `${(a.monthAll / goal.targetAmount * 100).toFixed(0)}% of monthly goal`}
-                  </p>
+                  <p className="mt-1 text-xs text-slate-400">{Math.min(100, a.monthAll / goal.targetAmount * 100).toFixed(0)}% of monthly goal</p>
                   <Link to="/user/goals" className="mt-2 block text-xs text-emerald-400 hover:underline">View Goal <ArrowRight className="inline h-3.5 w-3.5" /></Link>
+                  {a.monthAll > goal.targetAmount && (
+                    <Link to="/user/alerts" className="mt-1 block text-xs font-semibold text-amber-300 hover:underline">See target alert in Alert History <ArrowRight className="inline h-3.5 w-3.5" /></Link>
+                  )}
                 </>
               ) : (
                 <div className="mt-2">

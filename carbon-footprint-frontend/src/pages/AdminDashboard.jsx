@@ -9,8 +9,8 @@ import {
   LayoutDashboard, LogOut, ChevronUp, ChevronDown, ChevronLeft, ChevronRight,
   Leaf, AlertTriangle, Shield, Layers, Activity, Fuel
 } from 'lucide-react';
+import { formatCreatedAt } from '../utils/dateTime';
 
-const ROWS_PER_PAGE = 8;
 
 const AdminDashboard = () => {
   const { showToast, logout } = useAuth();
@@ -32,6 +32,8 @@ const AdminDashboard = () => {
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(5);
+  const [totalRecords, setTotalRecords] = useState(0);
 
   const fetchDashboardData = async () => {
     setLoading(true);
@@ -40,16 +42,20 @@ const AdminDashboard = () => {
         api.get('/admin/dashboard'),
         api.get('/admin/users'),
       ]);
-      setStats(statsRes.data);
-      setUsers(usersRes.data);
+      setStats(statsRes?.data || null);
+      setUsers(Array.isArray(usersRes?.data) ? usersRes.data : []);
     } catch (err) {
-      showToast('Failed to load dashboard data', 'error');
+      setStats(null);
+      setUsers([]);
+      showToast(err?.message || 'Failed to load admin dashboard', 'error');
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => { fetchDashboardData(); }, []);
+
+  useEffect(() => { setCurrentPage(1); }, [activeTab]);
   useEffect(() => { setActivePage(location.pathname.endsWith('/users') ? 'users' : 'dashboard'); }, [location.pathname]);
 
   const handleApprove = async (id) => {
@@ -90,16 +96,14 @@ const AdminDashboard = () => {
       : <ChevronDown className="w-3 h-3 text-emerald-400" />;
   };
 
-  const filtered = users
-    .filter((u) => activeTab === 'ALL' || u.status === activeTab)
-    .sort((a, b) => {
-      const av = (a[sortKey] || '').toString().toLowerCase();
-      const bv = (b[sortKey] || '').toString().toLowerCase();
-      return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
-    });
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / ROWS_PER_PAGE));
-  const paginated = filtered.slice((currentPage - 1) * ROWS_PER_PAGE, currentPage * ROWS_PER_PAGE);
+  const filtered = users.filter(u => activeTab === 'ALL' || u.status === activeTab).sort((a, b) => {
+    const av = (a[sortKey] || '').toString().toLowerCase();
+    const bv = (b[sortKey] || '').toString().toLowerCase();
+    return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
+  });
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const paginated = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const displayTotal = filtered.length;
 
   const pieData = stats ? [
     { name: 'Pending', value: stats.pendingUsers, color: '#f59e0b' },
@@ -393,13 +397,14 @@ const AdminDashboard = () => {
                           <span className="flex items-center gap-1">{label} <SortIcon col={key} /></span>
                         </th>
                       ))}
+                      <th className="py-3.5 px-4">Created At</th>
                       <th className="py-3.5 px-4 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800/60">
                     {paginated.length === 0 ? (
                       <tr>
-                        <td colSpan="6" className="py-8 text-center text-slate-500">
+                        <td colSpan="7" className="py-8 text-center text-slate-500">
                           No users in <span className="font-semibold text-slate-400">{activeTab}</span>.
                         </td>
                       </tr>
@@ -422,6 +427,7 @@ const AdminDashboard = () => {
                               {u.status}
                             </span>
                           </td>
+                          <td className="py-3.5 px-4 text-xs text-slate-400 whitespace-nowrap">{formatCreatedAt(u.createdAt)}</td>
                           <td className="py-3.5 px-4 text-right">
                             <div className="flex items-center justify-end gap-2">
                               <button
@@ -461,41 +467,21 @@ const AdminDashboard = () => {
                 </table>
               </div>
 
-              {/* Pagination */}
-              {totalPages > 1 && (
-                <div className="flex items-center justify-between pt-2 border-t border-slate-800 text-xs text-slate-400">
-                  <span>
-                    Showing {Math.min((currentPage - 1) * ROWS_PER_PAGE + 1, filtered.length)}–{Math.min(currentPage * ROWS_PER_PAGE, filtered.length)} of {filtered.length}
-                  </span>
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
-                      disabled={currentPage === 1}
-                      className="p-1.5 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
-                      <ChevronLeft className="w-4 h-4" />
-                    </button>
-                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-                      <button
-                        key={p}
-                        onClick={() => setCurrentPage(p)}
-                        className={`w-7 h-7 rounded font-semibold transition-all ${
-                          p === currentPage ? 'bg-emerald-500 text-slate-950' : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
-                        }`}
-                      >
-                        {p}
-                      </button>
-                    ))}
-                    <button
-                      onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
-                      disabled={currentPage === totalPages}
-                      className="p-1.5 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
-                      <ChevronRight className="w-4 h-4" />
-                    </button>
-                  </div>
+              {/* Server-side pagination */}
+              <div className="flex flex-col gap-3 pt-3 border-t border-slate-800 text-xs text-slate-400 sm:flex-row sm:items-center sm:justify-between">
+                <span>Showing {displayTotal === 0 ? 0 : (currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, displayTotal)} of {displayTotal}</span>
+                <div className="flex flex-wrap items-center gap-2">
+                  <label>Rows:</label>
+                  <select value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setCurrentPage(1); }} className="rounded bg-slate-800 px-2 py-1.5 text-slate-200">
+                    {[5,10,15,20,50].map(n => <option key={n} value={n}>{n}</option>)}
+                  </select>
+                  <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="rounded bg-slate-800 px-3 py-1.5 disabled:opacity-40">Previous</button>
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+                    <button key={p} onClick={() => setCurrentPage(p)} className={`w-7 h-7 rounded font-semibold ${p === currentPage ? 'bg-emerald-500 text-slate-950' : 'bg-slate-800 text-slate-300'}`}>{p}</button>
+                  ))}
+                  <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="rounded bg-slate-800 px-3 py-1.5 disabled:opacity-40">Next</button>
                 </div>
-              )}
+              </div>
             </div>
           )}
 

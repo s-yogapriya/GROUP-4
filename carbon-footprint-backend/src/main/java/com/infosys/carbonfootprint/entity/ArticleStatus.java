@@ -1,2 +1,2 @@
 package com.infosys.carbonfootprint.entity;
-public enum ArticleStatus { DRAFT, PUBLISHED, HIDDEN }
+public enum ArticleStatus { DRAFT, PUBLISHED, UNPUBLISHED }

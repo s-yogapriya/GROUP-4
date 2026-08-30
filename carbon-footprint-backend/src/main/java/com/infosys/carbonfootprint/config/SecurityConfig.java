@@ -1,6 +1,7 @@
 package com.infosys.carbonfootprint.config;
 
 import com.infosys.carbonfootprint.security.UserDetailsServiceImpl;
+import com.infosys.carbonfootprint.security.OAuth2AuthenticationSuccessHandler;
 import com.infosys.carbonfootprint.security.jwt.JwtAuthEntryPoint;
 import com.infosys.carbonfootprint.security.jwt.JwtAuthFilter;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,6 +38,9 @@ public class SecurityConfig {
 
     @Autowired
     private JwtAuthEntryPoint unauthorizedHandler;
+
+    @Autowired
+    private OAuth2AuthenticationSuccessHandler oauth2SuccessHandler;
 
     @Bean
     public JwtAuthFilter authenticationJwtTokenFilter() {
@@ -81,9 +85,9 @@ public class SecurityConfig {
         http.cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(csrf -> csrf.disable())
                 .exceptionHandling(exception -> exception.authenticationEntryPoint(unauthorizedHandler))
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
                 .authorizeHttpRequests(auth ->
-                        auth.requestMatchers("/api/v1/auth/**").permitAll()
+                        auth.requestMatchers("/api/v1/auth/**", "/oauth2/**", "/login/oauth2/**").permitAll()
                                 .requestMatchers("/api/v1/public/**").permitAll()
                                 .requestMatchers("/uploads/**").permitAll()
                                 .requestMatchers("/api/v1/admin/categories/**").hasAuthority("ROLE_ADMIN")
@@ -96,6 +100,9 @@ public class SecurityConfig {
                 );
 
         http.authenticationProvider(authenticationProvider());
+        http.oauth2Login(oauth -> oauth
+                .successHandler(oauth2SuccessHandler)
+                .failureUrl("/login?oauthError=true"));
         http.addFilterBefore(authenticationJwtTokenFilter(), UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

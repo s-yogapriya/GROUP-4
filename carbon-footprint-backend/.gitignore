@@ -20,6 +20,7 @@ spring-boot-*.jar
 # Environment & Config
 .env
 *.env.local
+!.env.example
 application-local.properties
 application-prod.properties
 

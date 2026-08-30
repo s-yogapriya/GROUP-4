@@ -65,6 +65,7 @@ public class UserMapper {
                 .state(address.getState())
                 .country(address.getCountry())
                 .pinCode(address.getPinCode())
+                .createdAt(address.getCreatedAt())
                 .build();
     }
 
@@ -88,6 +89,7 @@ public class UserMapper {
                 .idType(govId.getIdType())
                 .idNumber(govId.getIdNumber())
                 .documentUrl(govId.getDocumentUrl())
+                .createdAt(govId.getCreatedAt())
                 .build();
     }
 

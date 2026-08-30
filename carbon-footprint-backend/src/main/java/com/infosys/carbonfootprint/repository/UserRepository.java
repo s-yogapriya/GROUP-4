@@ -6,6 +6,8 @@ import com.infosys.carbonfootprint.entity.UserStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 import java.util.Optional;
@@ -27,6 +29,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Boolean existsByUsername(String username);
 
     List<User> findByStatusOrderByCreatedAtDesc(UserStatus status);
+    @Query("SELECT u FROM User u JOIN u.roles r WHERE r.name = com.infosys.carbonfootprint.entity.RoleType.ROLE_USER AND u.status = :status ORDER BY u.createdAt DESC")
+    Page<User> findRegisteredUsersByStatus(@org.springframework.data.repository.query.Param("status") UserStatus status, Pageable pageable);
 
     List<User> findAllByOrderByCreatedAtDesc();
 
@@ -36,4 +40,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     @Query("SELECT u FROM User u JOIN u.roles r WHERE r.name = com.infosys.carbonfootprint.entity.RoleType.ROLE_USER ORDER BY u.createdAt DESC")
     List<User> findAllRegisteredUsers();
+
+    @Query("SELECT u FROM User u JOIN u.roles r WHERE r.name = com.infosys.carbonfootprint.entity.RoleType.ROLE_USER ORDER BY u.createdAt DESC")
+    Page<User> findAllRegisteredUsers(Pageable pageable);
 }

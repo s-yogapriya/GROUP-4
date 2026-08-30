@@ -12,6 +12,10 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 
 /**
  * Controller handling Admin Management REST endpoints (Dashboard stats, approval/rejection workflows, user queries).
@@ -27,6 +31,14 @@ public class AdminController {
     @Autowired
     private ActivityLogService activityLogService;
 
+    @GetMapping("/users/page")
+    public ResponseEntity<ApiResponse<Page<UserSummaryDto>>> getUsersPage(@RequestParam(defaultValue="0") int page, @RequestParam(defaultValue="5") int size, @RequestParam(required=false) UserStatus status) {
+        int safeSize = List.of(5,10,15,20,50).contains(size) ? size : 5;
+        Pageable pageable = PageRequest.of(Math.max(0,page), safeSize, Sort.by("createdAt").descending());
+        Page<UserSummaryDto> result = status == null ? adminService.getAllUsersPage(pageable) : adminService.getUsersByStatusPage(status, pageable);
+        return ResponseEntity.ok(ApiResponse.success("Users page fetched", result));
+    }
+
     @GetMapping("/dashboard")
     public ResponseEntity<ApiResponse<DashboardStatsDto>> getDashboardStats() {
         DashboardStatsDto stats = adminService.getDashboardStats();
@@ -37,6 +49,13 @@ public class AdminController {
     public ResponseEntity<ApiResponse<List<UserSummaryDto>>> getAllUsers() {
         List<UserSummaryDto> users = adminService.getAllUsers();
         return ResponseEntity.ok(ApiResponse.success("All registered users retrieved successfully", users));
+    }
+
+    @GetMapping("/activity-logs/page")
+    public ResponseEntity<ApiResponse<Page<ActivityLogDto>>> getActivityLogsPage(@RequestParam(defaultValue="0") int page, @RequestParam(defaultValue="5") int size) {
+        int safeSize = List.of(5,10,15,20,50).contains(size) ? size : 5;
+        Pageable pageable = PageRequest.of(Math.max(0,page), safeSize, Sort.by("activityDate").descending().and(Sort.by("createdAt").descending()));
+        return ResponseEntity.ok(ApiResponse.success("Activity logs page fetched", activityLogService.getPageForAdmin(pageable)));
     }
 
     @GetMapping("/activity-logs")

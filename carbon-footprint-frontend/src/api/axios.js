@@ -8,9 +8,11 @@ const api = axios.create({
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
+
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+
     return config;
   },
   (error) => Promise.reject(error)
@@ -22,15 +24,26 @@ api.interceptors.response.use(
   (error) => {
     if (error.response && error.response.status === 401) {
       const currentPath = window.location.pathname;
-      if (!currentPath.includes('/login') && !currentPath.includes('/register') && currentPath !== '/') {
+
+      if (
+        !currentPath.includes('/login') &&
+        !currentPath.includes('/register') &&
+        currentPath !== '/'
+      ) {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
         window.location.href = '/login?expired=true';
       }
     }
-    // Preserve API validation details so forms can show field-level feedback.
-    if (error.response?.data) return Promise.reject(error.response.data);
-    return Promise.reject({ message: error.message || 'An unexpected error occurred' });
+
+    if (error.response?.data) {
+      return Promise.reject(error.response.data);
+    }
+
+    return Promise.reject({
+      message:
+        error.message || 'An unexpected error occurred',
+    });
   }
 );
 

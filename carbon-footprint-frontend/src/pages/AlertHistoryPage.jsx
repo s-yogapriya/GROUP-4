@@ -1,7 +1,10 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import api from '../api/axios';
 import { Bell, CheckCheck, Trash2, RefreshCw, Filter } from 'lucide-react';
+import { formatCreatedAt } from '../utils/dateTime';
 
+import Pagination from '../components/Pagination';
+import { paginate } from '../utils/clientPagination';
 const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
 function severityStyle(severity) {
@@ -17,17 +20,25 @@ function severityBadge(severity) {
 }
 
 export default function AlertHistoryPage() {
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(5);
   const [alerts, setAlerts] = useState([]);
+  const [totalRecords, setTotalRecords] = useState(0);
   const [loading, setLoading] = useState(true);
   const [filterRead, setFilterRead] = useState('ALL');
   const [filterCategory, setFilterCategory] = useState('ALL');
 
   const load = useCallback(() => {
     setLoading(true);
-    api.get('/user/alerts').then(r => setAlerts(r.data || [])).finally(() => setLoading(false));
+    api.get('/user/alerts')
+      .then(r => setAlerts(Array.isArray(r?.data) ? r.data : []))
+      .catch(() => setAlerts([]))
+      .finally(() => setLoading(false));
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => { setPage(1); }, [filterRead, filterCategory]);
 
   const markRead = async (id) => {
     await api.put(`/user/alerts/${id}/read`);
@@ -54,13 +65,15 @@ export default function AlertHistoryPage() {
     return true;
   });
 
+  const safePage=Math.max(1,page);
+  const paginatedVisible=paginate(visible, safePage, pageSize);
   return (
     <main className="mx-auto max-w-5xl space-y-6 px-5 py-8">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-extrabold text-white">Alert History</h1>
           <p className="text-sm text-slate-400">
-            High-emission warnings generated from your activity data.
+            High-emission warnings and monthly target alerts generated from your activity data.
             {unread > 0 && <span className="ml-2 rounded-full bg-amber-500 px-2 py-0.5 text-xs font-black text-slate-950">{unread} unread</span>}
           </p>
         </div>
@@ -99,7 +112,7 @@ export default function AlertHistoryPage() {
         <p className="text-slate-400">Loading alerts…</p>
       ) : visible.length ? (
         <div className="space-y-3">
-          {visible.map(x => (
+          {paginatedVisible.map(x => (
             <article key={x.id} className={`rounded-2xl border p-5 transition-all ${x.read ? 'border-slate-700 bg-slate-800/40' : severityStyle(x.severity)}`}>
               <div className="flex gap-3">
                 <Bell className={`mt-1 h-5 w-5 shrink-0 ${x.severity === 'HIGH' ? 'text-rose-400' : 'text-amber-400'}`} />
@@ -120,7 +133,7 @@ export default function AlertHistoryPage() {
                   {x.recommendation && <p className="mt-2 text-sm text-emerald-300">{x.recommendation}</p>}
                   <p className="mt-2 text-xs text-slate-500">
                     {x.month && x.year ? `${MONTH_NAMES[x.month - 1]} ${x.year} · ` : ''}
-                    {new Date(x.createdAt).toLocaleString()}
+                    {formatCreatedAt(x.createdAt)}
                   </p>
                   <div className="mt-3 flex gap-3">
                     {!x.read && (
@@ -144,6 +157,7 @@ export default function AlertHistoryPage() {
             : "You're all caught up. No high-emission warnings yet."}
         </div>
       )}
+      <Pagination page={safePage} pageSize={pageSize} total={visible.length} onPageChange={setPage} onPageSizeChange={n=>{setPageSize(n);setPage(1);}} />
     </main>
   );
 }

@@ -7,7 +7,7 @@ const UserDetailModal = ({ user, onClose, onApprove, onReject }) => {
 
   const docUrl = user.governmentId?.documentUrl;
   const isPdf = docUrl?.toLowerCase().endsWith('.pdf');
-  const fullDocUrl = docUrl ? `http://localhost:8080${docUrl}` : null;
+  const fullDocUrl = docUrl ? (docUrl.startsWith('http') ? docUrl : docUrl) : null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm overflow-y-auto">

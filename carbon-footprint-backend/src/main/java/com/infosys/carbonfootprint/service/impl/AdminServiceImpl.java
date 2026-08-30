@@ -18,6 +18,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import java.util.stream.Collectors;
 
 @Service
@@ -83,6 +85,18 @@ public class AdminServiceImpl implements AdminService {
         return userRepository.findByStatusOrderByCreatedAtDesc(status).stream()
                 .map(userMapper::toSummaryDto)
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<UserSummaryDto> getAllUsersPage(Pageable pageable) {
+        return userRepository.findAllRegisteredUsers(pageable).map(userMapper::toSummaryDto);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<UserSummaryDto> getUsersByStatusPage(UserStatus status, Pageable pageable) {
+        return userRepository.findRegisteredUsersByStatus(status, pageable).map(userMapper::toSummaryDto);
     }
 
     @Override

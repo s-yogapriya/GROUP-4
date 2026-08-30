@@ -1,12 +1,38 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
-import { 
-  Activity, Edit3, Trash2, CheckCircle2, XCircle, Search, 
-  RefreshCw, Plus, Layers, AlertCircle, Car, Zap, Utensils, 
-  ShoppingBag, Truck, Flame, Factory, TreePine, Wind, Plane, 
-  Bike, Bus, Train, Trash, Home, Globe, Sun, Package
+import {
+  Activity,
+  AlertCircle,
+  Bike,
+  Bus,
+  Car,
+  CheckCircle2,
+  Edit3,
+  Factory,
+  Flame,
+  Globe,
+  Home,
+  Layers,
+  Package,
+  Plane,
+  Plus,
+  RefreshCw,
+  Search,
+  ShoppingBag,
+  Sun,
+  Trash2,
+  Train,
+  TreePine,
+  Truck,
+  Utensils,
+  Wind,
+  Zap,
+  XCircle,
 } from 'lucide-react';
+import { formatCreatedAt } from '../utils/dateTime';
+import Pagination from '../components/Pagination';
+import { paginate } from '../utils/clientPagination';
 
 const ICON_OPTIONS = [
   { name: 'Activity', icon: Activity },
@@ -26,55 +52,78 @@ const ICON_OPTIONS = [
   { name: 'Factory', icon: Factory },
   { name: 'TreePine', icon: TreePine },
   { name: 'Globe', icon: Globe },
+  { name: 'Wind', icon: Wind },
 ];
 
-const STANDARD_UNITS = ['km', 'kWh', 'meals', 'items', 'Liters', 'kg', 'hours', 'trips'];
+const STANDARD_UNITS = [
+  'km',
+  'kWh',
+  'meals',
+  'items',
+  'Liters',
+  'kg',
+  'hours',
+  'trips',
+];
 
 const ActivityTypeManagementPage = () => {
   const { showToast } = useAuth();
+
   const [categories, setCategories] = useState([]);
   const [activityTypes, setActivityTypes] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Filters
   const [selectedCategoryId, setSelectedCategoryId] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(5);
 
-  // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingActivity, setEditingActivity] = useState(null);
-  const [formData, setFormData] = useState({
+  const [deletingActivity, setDeletingActivity] = useState(null);
+  const [formErrors, setFormErrors] = useState({});
+  const [submitting, setSubmitting] = useState(false);
+
+  const emptyForm = {
     categoryId: '',
     activityCode: '',
     activityName: '',
     description: '',
     unit: 'km',
     minQuantity: 0.1,
-    maxQuantity: 5000.0,
-    defaultQuantity: 1.0,
+    maxQuantity: 5000,
+    defaultQuantity: 1,
     displayOrder: 1,
     icon: 'Activity',
     status: 'ACTIVE',
     remarks: '',
-  });
-  const [formErrors, setFormErrors] = useState({});
-  const [submitting, setSubmitting] = useState(false);
+  };
 
-  // Delete Confirm Modal
-  const [deletingActivity, setDeletingActivity] = useState(null);
+  const [formData, setFormData] = useState(emptyForm);
+
+  const readArray = (response) => {
+    const payload = response?.data;
+    return Array.isArray(payload) ? payload : Array.isArray(payload?.content) ? payload.content : [];
+  };
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [catRes, actRes] = await Promise.all([
+      const [categoryResponse, activityResponse] = await Promise.all([
         api.get('/admin/categories'),
         api.get('/admin/activity-types'),
       ]);
-      setCategories(catRes.data || []);
-      setActivityTypes(actRes.data || []);
-    } catch (err) {
-      showToast('Failed to load data: ' + (err.toString() || 'Server error'), 'error');
+
+      setCategories(readArray(categoryResponse));
+      setActivityTypes(readArray(activityResponse));
+    } catch (error) {
+      setCategories([]);
+      setActivityTypes([]);
+      showToast(
+        error?.response?.data?.message || error?.message || 'Failed to load activity type data',
+        'error'
+      );
     } finally {
       setLoading(false);
     }
@@ -84,288 +133,300 @@ const ActivityTypeManagementPage = () => {
     fetchData();
   }, []);
 
+  useEffect(() => {
+    setPage(1);
+  }, [selectedCategoryId, searchQuery, statusFilter]);
+
+  const filteredActivities = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+
+    return activityTypes
+      .filter((activity) => {
+        const matchesCategory =
+          selectedCategoryId === 'ALL' ||
+          String(activity.categoryId) === String(selectedCategoryId);
+
+        const searchable = [
+          activity.activityCode,
+          activity.activityName,
+          activity.categoryCode,
+          activity.categoryName,
+          activity.description,
+        ]
+          .map((value) => String(value || '').toLowerCase())
+          .join(' ');
+
+        const matchesSearch = !query || searchable.includes(query);
+        const matchesStatus = statusFilter === 'ALL' || activity.status === statusFilter;
+
+        return matchesCategory && matchesSearch && matchesStatus;
+      })
+      .sort((a, b) => {
+        const categoryA = `${a.categoryCode || ''}|${a.categoryName || ''}`;
+        const categoryB = `${b.categoryCode || ''}|${b.categoryName || ''}`;
+        return (
+          categoryA.localeCompare(categoryB) ||
+          String(a.activityName || '').localeCompare(String(b.activityName || ''))
+        );
+      });
+  }, [activityTypes, selectedCategoryId, searchQuery, statusFilter]);
+
+  const pagedActivities = paginate(filteredActivities, page, pageSize);
+
+  const renderIcon = (iconName) => {
+    const match = ICON_OPTIONS.find((item) => item.name === iconName);
+    const Icon = match?.icon || Activity;
+    return <Icon className="h-5 w-5 text-emerald-400" />;
+  };
+
+  const resetModal = () => {
+    setIsModalOpen(false);
+    setEditingActivity(null);
+    setFormErrors({});
+    setFormData(emptyForm);
+  };
+
   const openAddModal = () => {
     setEditingActivity(null);
-    const defaultCatId = categories.length > 0 ? categories[0].categoryId : '';
-    setFormData({
-      categoryId: defaultCatId,
-      activityCode: '',
-      activityName: '',
-      description: '',
-      unit: 'km',
-      minQuantity: 0.1,
-      maxQuantity: 5000.0,
-      defaultQuantity: 1.0,
-      displayOrder: activityTypes.length + 1,
-      icon: 'Activity',
-      status: 'ACTIVE',
-      remarks: '',
-    });
     setFormErrors({});
+    setFormData({
+      ...emptyForm,
+      categoryId: categories[0]?.categoryId || '',
+      displayOrder: activityTypes.length + 1,
+    });
     setIsModalOpen(true);
   };
 
-  const openEditModal = (act) => {
-    setEditingActivity(act);
-    setFormData({
-      categoryId: act.categoryId || '',
-      activityCode: act.activityCode || '',
-      activityName: act.activityName || '',
-      description: act.description || '',
-      unit: act.unit || 'km',
-      minQuantity: act.minQuantity ?? 0.1,
-      maxQuantity: act.maxQuantity ?? 5000.0,
-      defaultQuantity: act.defaultQuantity ?? 1.0,
-      displayOrder: act.displayOrder ?? 1,
-      icon: act.icon || 'Activity',
-      status: act.status || 'ACTIVE',
-      remarks: act.remarks || '',
-    });
+  const openEditModal = (activity) => {
+    setEditingActivity(activity);
     setFormErrors({});
+    setFormData({
+      categoryId: activity.categoryId || '',
+      activityCode: activity.activityCode || '',
+      activityName: activity.activityName || '',
+      description: activity.description || '',
+      unit: activity.unit || 'km',
+      minQuantity: activity.minQuantity ?? 0.1,
+      maxQuantity: activity.maxQuantity ?? 5000,
+      defaultQuantity: activity.defaultQuantity ?? 1,
+      displayOrder: activity.displayOrder ?? 1,
+      icon: activity.icon || 'Activity',
+      status: activity.status || 'ACTIVE',
+      remarks: activity.remarks || '',
+    });
     setIsModalOpen(true);
   };
 
   const validateForm = () => {
     const errors = {};
-    if (!formData.categoryId) {
-      errors.categoryId = 'Category is required';
-    }
-    if (!formData.activityName || !formData.activityName.trim()) {
-      errors.activityName = 'Activity name is required';
-    }
-    if (!formData.unit || !formData.unit.trim()) {
-      errors.unit = 'Unit of measurement is required';
-    }
     const min = Number(formData.minQuantity);
     const max = Number(formData.maxQuantity);
     const def = Number(formData.defaultQuantity);
+    const order = Number(formData.displayOrder);
+
+    if (!formData.categoryId) errors.categoryId = 'Category is required';
+    if (!formData.activityName.trim()) errors.activityName = 'Activity name is required';
+    if (!formData.unit.trim()) errors.unit = 'Unit is required';
+
+    if (formData.activityCode && !/^[A-Z0-9_]{2,20}$/.test(formData.activityCode.toUpperCase())) {
+      errors.activityCode = 'Use 2-20 uppercase letters, digits or underscores';
+    }
+
     if (!Number.isFinite(min) || min < 0) errors.minQuantity = 'Minimum quantity must be a valid non-negative number';
     if (!Number.isFinite(max) || max <= min) errors.maxQuantity = 'Maximum quantity must be greater than minimum quantity';
-    if (!Number.isFinite(def) || def < min || def > max) errors.defaultQuantity = 'Default quantity must be between minimum and maximum quantity';
-    if (!Number.isInteger(Number(formData.displayOrder)) || Number(formData.displayOrder) < 1) errors.displayOrder = 'Display order must be a valid positive number';
-    if (!['ACTIVE', 'INACTIVE'].includes(formData.status)) errors.status = 'Status must be ACTIVE or INACTIVE';
+    if (!Number.isFinite(def) || def < min || def > max) errors.defaultQuantity = 'Default quantity must be between minimum and maximum';
+    if (!Number.isInteger(order) || order < 1) errors.displayOrder = 'Display order must be a positive integer';
+    if (!['ACTIVE', 'INACTIVE'].includes(formData.status)) errors.status = 'Invalid status';
+
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
 
-  const applyBackendErrors = (error) => {
-    const backendErrors = error?.data;
-    if (backendErrors && typeof backendErrors === 'object' && !Array.isArray(backendErrors)) {
-      setFormErrors(backendErrors);
-      return true;
-    }
-    const message = error?.message || 'Unable to save activity type';
-    const lowered = message.toLowerCase();
-    if (lowered.includes('code')) setFormErrors({ activityCode: message });
-    else if (lowered.includes('name') || lowered.includes('activity')) setFormErrors({ activityName: message });
-    else if (lowered.includes('category')) setFormErrors({ categoryId: message });
-    else if (lowered.includes('unit')) setFormErrors({ unit: message });
-    else return false;
-    return true;
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSubmit = async (event) => {
+    event.preventDefault();
     if (!validateForm()) return;
-    if (editingActivity && !window.confirm(`Update activity type "${editingActivity.activityName}"?`)) return;
+
+    if (
+      editingActivity &&
+      !window.confirm(`Update activity type "${editingActivity.activityName}"?`)
+    ) {
+      return;
+    }
 
     setSubmitting(true);
-    setFormErrors({});
     try {
       const payload = {
-        ...formData,
         categoryId: Number(formData.categoryId),
+        activityCode: formData.activityCode.trim().toUpperCase(),
+        activityName: formData.activityName.trim(),
+        description: formData.description.trim(),
+        unit: formData.unit.trim(),
         minQuantity: Number(formData.minQuantity),
         maxQuantity: Number(formData.maxQuantity),
         defaultQuantity: Number(formData.defaultQuantity),
         displayOrder: Number(formData.displayOrder),
+        icon: formData.icon,
+        status: formData.status,
+        remarks: formData.remarks.trim(),
       };
 
       if (editingActivity) {
-        const res = await api.put(`/admin/activity-types/${editingActivity.activityTypeId}`, payload);
-        showToast(res.message || 'Activity Type updated successfully!', 'success');
+        await api.put(`/admin/activity-types/${editingActivity.activityTypeId}`, payload);
+        showToast('Activity type updated successfully!', 'success');
       } else {
-        const res = await api.post('/admin/activity-types', payload);
-        showToast(res.message || 'Activity Type created successfully!', 'success');
+        await api.post('/admin/activity-types', payload);
+        showToast('Activity type created successfully!', 'success');
       }
-      setIsModalOpen(false);
-      fetchData();
-    } catch (err) {
-      if (!applyBackendErrors(err)) showToast(err?.message || 'Unable to save activity type. Please try again.', 'error');
+
+      resetModal();
+      await fetchData();
+    } catch (error) {
+      const message =
+        error?.response?.data?.message ||
+        error?.message ||
+        'Unable to save activity type';
+      showToast(message, 'error');
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handleToggleStatus = async (act) => {
+  const toggleStatus = async (activity) => {
     try {
-      const payload = {
-        categoryId: act.categoryId,
-        activityCode: act.activityCode,
-        activityName: act.activityName,
-        description: act.description,
-        unit: act.unit,
-        minQuantity: act.minQuantity,
-        maxQuantity: act.maxQuantity,
-        defaultQuantity: act.defaultQuantity,
-        displayOrder: act.displayOrder,
-        icon: act.icon,
-        status: act.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE',
-        remarks: act.remarks,
-      };
-      const res = await api.put(`/admin/activity-types/${act.activityTypeId}`, payload);
-      showToast(res.message || `Activity ${act.activityName} status toggled!`, 'success');
-      fetchData();
-    } catch (err) {
-      showToast('Status update failed: ' + err.toString(), 'error');
+      await api.put(`/admin/activity-types/${activity.activityTypeId}`, {
+        categoryId: Number(activity.categoryId),
+        activityCode: activity.activityCode || '',
+        activityName: activity.activityName,
+        description: activity.description || '',
+        unit: activity.unit,
+        minQuantity: activity.minQuantity,
+        maxQuantity: activity.maxQuantity,
+        defaultQuantity: activity.defaultQuantity,
+        displayOrder: activity.displayOrder,
+        icon: activity.icon || 'Activity',
+        status: activity.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE',
+        remarks: activity.remarks || '',
+      });
+
+      showToast('Activity status updated successfully!', 'success');
+      await fetchData();
+    } catch (error) {
+      showToast(
+        error?.response?.data?.message || error?.message || 'Unable to update activity status',
+        'error'
+      );
     }
   };
 
-  const handleDelete = async () => {
+  const deleteActivity = async () => {
     if (!deletingActivity) return;
+
     try {
-      const res = await api.delete(`/admin/activity-types/${deletingActivity.activityTypeId}`);
-      showToast(res.message || 'Activity Type deleted successfully!', 'info');
+      await api.delete(`/admin/activity-types/${deletingActivity.activityTypeId}`);
+      showToast('Activity type deleted successfully!', 'success');
       setDeletingActivity(null);
-      fetchData();
-    } catch (err) {
-      showToast('Deletion failed: ' + err.toString(), 'error');
+      await fetchData();
+    } catch (error) {
+      showToast(
+        error?.response?.data?.message || error?.message || 'Unable to delete activity type',
+        'error'
+      );
     }
-  };
-
-  const filteredActivityTypes = activityTypes.filter((act) => {
-    const matchesCategory = 
-      selectedCategoryId === 'ALL' || String(act.categoryId) === String(selectedCategoryId);
-
-    const matchesSearch = 
-      act.activityName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      act.activityCode.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (act.categoryName && act.categoryName.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (act.description && act.description.toLowerCase().includes(searchQuery.toLowerCase()));
-
-    const matchesStatus = 
-      statusFilter === 'ALL' || act.status === statusFilter;
-
-    return matchesCategory && matchesSearch && matchesStatus;
-  });
-
-  const renderIcon = (iconName) => {
-    const iconObj = ICON_OPTIONS.find((item) => item.name === iconName);
-    const IconComp = iconObj ? iconObj.icon : Activity;
-    return <IconComp className="w-5 h-5 text-emerald-400" />;
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col">
-      <main className="flex-1 max-w-7xl w-full mx-auto px-5 lg:px-8 py-8 space-y-8">
-        
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-6 border-b border-slate-800">
+    <div className="min-h-screen bg-slate-900 text-slate-100">
+      <main className="mx-auto w-full max-w-7xl space-y-8 px-5 py-8 lg:px-8">
+        <div className="flex flex-col gap-4 border-b border-slate-800 pb-6 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-white flex items-center gap-3">
-              <Activity className="w-7 h-7 text-emerald-400" />
-              Activity Type Management (Admin)
+            <h1 className="flex items-center gap-3 text-2xl font-extrabold text-white sm:text-3xl">
+              <Activity className="h-7 w-7 text-emerald-400" />
+              Activity Type Management
             </h1>
-            <p className="text-slate-400 text-xs sm:text-sm mt-1">
-              Define sub-activities under each category (e.g., Transport $\rightarrow$ Car, Bus; Food $\rightarrow$ Veg Meal) with units and quantities
+            <p className="mt-1 text-sm text-slate-400">
+              Manage activities under each category with unit and quantity ranges.
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex gap-3">
             <button
+              type="button"
               onClick={fetchData}
-              className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition-all border border-slate-700"
-              title="Refresh Data"
+              className="rounded-xl border border-slate-700 bg-slate-800 p-2.5 text-slate-300 hover:bg-slate-700"
+              title="Refresh"
             >
-              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             </button>
             <button
+              type="button"
               onClick={openAddModal}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-bold text-sm transition-all shadow-lg shadow-emerald-900/30"
+              className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-slate-950 hover:bg-emerald-500"
             >
-              <Plus className="w-4 h-4 stroke-[3]" />
-              <span>Add Activity Type</span>
+              <Plus className="h-4 w-4" />
+              Add Activity Type
             </button>
           </div>
         </div>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="bg-slate-800/60 backdrop-blur-md rounded-2xl p-5 border border-slate-700/60">
-            <div className="text-slate-400 text-xs font-semibold uppercase tracking-wider">Total Activity Types</div>
-            <div className="text-3xl font-black text-white mt-1">{activityTypes.length}</div>
-          </div>
-          <div className="bg-slate-800/60 backdrop-blur-md rounded-2xl p-5 border border-emerald-500/20">
-            <div className="text-emerald-400 text-xs font-semibold uppercase tracking-wider">Active Activities</div>
-            <div className="text-3xl font-black text-emerald-400 mt-1">
-              {activityTypes.filter((a) => a.status === 'ACTIVE').length}
-            </div>
-          </div>
-          <div className="bg-slate-800/60 backdrop-blur-md rounded-2xl p-5 border border-teal-500/20">
-            <div className="text-teal-400 text-xs font-semibold uppercase tracking-wider">Categories Covered</div>
-            <div className="text-3xl font-black text-teal-400 mt-1">
-              {new Set(activityTypes.map((a) => a.categoryId)).size}
-            </div>
-          </div>
-        </div>
-
-        {/* Category Pills & Filters */}
         <div className="space-y-4">
-          {/* Category Tabs */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-2 border-b border-slate-800 scrollbar-none">
+          <div className="flex gap-2 overflow-x-auto border-b border-slate-800 pb-2">
             <button
+              type="button"
               onClick={() => setSelectedCategoryId('ALL')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-2 ${
+              className={`flex shrink-0 items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold ${
                 selectedCategoryId === 'ALL'
-                  ? 'bg-emerald-600 text-slate-950 shadow-md shadow-emerald-900/30'
-                  : 'bg-slate-800/80 text-slate-400 hover:text-slate-200 border border-slate-700/60'
+                  ? 'bg-emerald-600 text-slate-950'
+                  : 'border border-slate-700 bg-slate-800 text-slate-400'
               }`}
             >
-              <Layers className="w-3.5 h-3.5" />
+              <Layers className="h-3.5 w-3.5" />
               All Categories ({activityTypes.length})
             </button>
 
-            {categories.map((cat) => {
-              const count = activityTypes.filter((a) => a.categoryId === cat.categoryId).length;
+            {categories.map((category) => {
+              const count = activityTypes.filter(
+                (activity) => String(activity.categoryId) === String(category.categoryId)
+              ).length;
+
               return (
                 <button
-                  key={cat.categoryId}
-                  onClick={() => setSelectedCategoryId(cat.categoryId)}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-2 ${
-                    String(selectedCategoryId) === String(cat.categoryId)
-                      ? 'bg-emerald-600 text-slate-950 shadow-md shadow-emerald-900/30'
-                      : 'bg-slate-800/80 text-slate-400 hover:text-slate-200 border border-slate-700/60'
+                  type="button"
+                  key={category.categoryId}
+                  onClick={() => setSelectedCategoryId(category.categoryId)}
+                  className={`flex shrink-0 items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold ${
+                    String(selectedCategoryId) === String(category.categoryId)
+                      ? 'bg-emerald-600 text-slate-950'
+                      : 'border border-slate-700 bg-slate-800 text-slate-400'
                   }`}
                 >
-                  <span className="w-2 h-2 rounded-full" style={{ backgroundColor: cat.colorCode || '#10B981' }} />
-                  {cat.categoryName} ({count})
+                  <span className="h-2 w-2 rounded-full bg-emerald-400" />
+                  {category.categoryCode} · {category.categoryName} ({count})
                 </button>
               );
             })}
           </div>
 
-          {/* Search & Status Controls */}
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-slate-800/40 p-4 rounded-2xl border border-slate-800">
-            <div className="relative w-full sm:w-80">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+          <div className="flex flex-col gap-4 rounded-2xl border border-slate-800 bg-slate-800/40 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="relative w-full max-w-xl">
+              <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
               <input
-                type="text"
-                placeholder="Search activity name, code, category..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-slate-900 border border-slate-700 rounded-xl text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder="Search activity, code, category..."
+                className="w-full rounded-xl border border-slate-700 bg-slate-950 py-2.5 pl-10 pr-4 text-sm text-white outline-none focus:border-emerald-500"
               />
             </div>
 
-            <div className="flex items-center gap-2 w-full sm:w-auto">
+            <div className="flex gap-2">
               {['ALL', 'ACTIVE', 'INACTIVE'].map((status) => (
                 <button
+                  type="button"
                   key={status}
                   onClick={() => setStatusFilter(status)}
-                  className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  className={`rounded-lg px-3.5 py-1.5 text-xs font-bold ${
                     statusFilter === status
-                      ? 'bg-emerald-600 text-slate-950 font-bold'
-                      : 'bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-700'
+                      ? 'bg-emerald-600 text-slate-950'
+                      : 'border border-slate-700 bg-slate-800 text-slate-400'
                   }`}
                 >
                   {status}
@@ -375,104 +436,110 @@ const ActivityTypeManagementPage = () => {
           </div>
         </div>
 
-        {/* Activity Types Table */}
-        <div className="bg-slate-800/50 backdrop-blur-md rounded-2xl border border-slate-700/80 overflow-hidden shadow-xl">
+        <div className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/70 shadow-xl">
           {loading ? (
             <div className="p-12 text-center text-slate-400">
-              <RefreshCw className="w-8 h-8 animate-spin mx-auto text-emerald-400 mb-3" />
+              <RefreshCw className="mx-auto mb-3 h-8 w-8 animate-spin text-emerald-400" />
               Loading activity types...
             </div>
-          ) : filteredActivityTypes.length === 0 ? (
+          ) : filteredActivities.length === 0 ? (
             <div className="p-12 text-center text-slate-400">
-              <Activity className="w-12 h-12 mx-auto text-slate-600 mb-3" />
+              <Activity className="mx-auto mb-3 h-10 w-10 text-slate-700" />
               <p className="font-semibold text-slate-300">No activity types found</p>
-              <p className="text-xs text-slate-500 mt-1">Try adding a new activity type or adjusting search filters.</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm text-slate-300">
-                <thead className="bg-slate-900/80 text-xs font-semibold uppercase tracking-wider text-slate-400 border-b border-slate-700">
+              <table className="w-full min-w-[1050px] text-left text-sm">
+                <thead className="border-b border-slate-700 bg-slate-950 text-xs uppercase tracking-wider text-slate-500">
                   <tr>
-                    <th className="py-4 px-5">Code</th>
-                    <th className="py-4 px-5">Activity Name</th>
-                    <th className="py-4 px-5">Category</th>
-                    <th className="py-4 px-5">Unit</th>
-                    <th className="py-4 px-5 text-center">Quantities (Min / Max / Default)</th>
-                    <th className="py-4 px-5 text-center">Status</th>
-                    <th className="py-4 px-5 text-right">Actions</th>
+                    <th className="px-5 py-4">Category Code / Name</th>
+                    <th className="px-5 py-4">Activity Name</th>
+                    <th className="px-5 py-4">Unit</th>
+                    <th className="px-5 py-4 text-center">Quantity (Min / Max / Default)</th>
+                    <th className="px-5 py-4">Created At</th>
+                    <th className="px-5 py-4 text-center">Status</th>
+                    <th className="px-5 py-4 text-right">Actions</th>
                   </tr>
                 </thead>
+
                 <tbody className="divide-y divide-slate-800">
-                  {filteredActivityTypes.map((act) => (
-                    <tr key={act.activityTypeId} className="hover:bg-slate-800/40 transition-colors">
-                      <td className="py-4 px-5">
-                        <span className="font-mono text-xs px-2.5 py-1 rounded-md bg-slate-900 text-emerald-400 border border-slate-700 font-bold">
-                          {act.activityCode}
-                        </span>
+                  {pagedActivities.map((activity) => (
+                    <tr key={activity.activityTypeId} className="hover:bg-slate-800/40">
+                      <td className="px-5 py-4">
+                        <div className="flex flex-col gap-1">
+                          <span className="w-fit rounded-md border border-slate-700 bg-slate-950 px-2.5 py-1 font-mono text-xs font-bold text-emerald-400">
+                            {activity.categoryCode || 'CATEGORY'}
+                          </span>
+                          <span className="text-xs font-semibold text-slate-300">
+                            {activity.categoryName || '-'}
+                          </span>
+                        </div>
                       </td>
-                      <td className="py-4 px-5 font-semibold text-white">
+
+                      <td className="px-5 py-4 font-semibold text-white">
                         <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-slate-900 border border-slate-700">
-                            {renderIcon(act.icon)}
+                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-700 bg-slate-950">
+                            {renderIcon(activity.icon)}
                           </div>
-                          <div>
-                            <div>{act.activityName}</div>
-                            {act.description && (
-                              <div className="text-xs text-slate-400 font-normal truncate max-w-xs">{act.description}</div>
+                          <div className="min-w-0">
+                            <div className="font-semibold text-white">{activity.activityName}</div>
+                            {activity.activityCode && (
+                              <div className="font-mono text-[10px] text-slate-500">{activity.activityCode}</div>
+                            )}
+                            {activity.description && (
+                              <div className="max-w-xs truncate text-xs font-normal text-slate-400">{activity.description}</div>
                             )}
                           </div>
                         </div>
                       </td>
-                      <td className="py-4 px-5">
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-900 text-slate-200 border border-slate-700">
-                          <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                          {act.categoryName || 'N/A'}
-                        </span>
+
+                      <td className="px-5 py-4 font-mono text-xs font-bold text-teal-400">{activity.unit}</td>
+
+                      <td className="px-5 py-4 text-center font-mono text-xs text-slate-300">
+                        {activity.minQuantity ?? 0} / {activity.maxQuantity ?? '∞'} /{' '}
+                        <span className="font-bold text-emerald-400">{activity.defaultQuantity ?? 1}</span>
                       </td>
-                      <td className="py-4 px-5 font-mono text-xs font-bold text-teal-400">
-                        {act.unit}
+
+                      <td className="whitespace-nowrap px-5 py-4 text-xs text-slate-400">
+                        {formatCreatedAt(activity.createdAt)}
                       </td>
-                      <td className="py-4 px-5 text-center font-mono text-xs text-slate-300">
-                        {act.minQuantity ?? 0} / {act.maxQuantity ?? '∞'} / <span className="text-emerald-400 font-bold">{act.defaultQuantity ?? 1}</span>
-                      </td>
-                      <td className="py-4 px-5 text-center">
+
+                      <td className="px-5 py-4 text-center">
                         <button
-                          onClick={() => handleToggleStatus(act)}
-                          title="Click to toggle status"
-                          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition-all ${
-                            act.status === 'ACTIVE'
-                              ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-700/60 hover:bg-emerald-900'
-                              : 'bg-rose-950/80 text-rose-300 border border-rose-700/60 hover:bg-rose-900'
+                          type="button"
+                          onClick={() => toggleStatus(activity)}
+                          className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-bold ${
+                            activity.status === 'ACTIVE'
+                              ? 'border-emerald-700/60 bg-emerald-950/80 text-emerald-300'
+                              : 'border-rose-700/60 bg-rose-950/80 text-rose-300'
                           }`}
                         >
-                          {act.status === 'ACTIVE' ? (
-                            <>
-                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                              ACTIVE
-                            </>
+                          {activity.status === 'ACTIVE' ? (
+                            <CheckCircle2 className="h-3.5 w-3.5" />
                           ) : (
-                            <>
-                              <XCircle className="w-3.5 h-3.5 text-rose-400" />
-                              INACTIVE
-                            </>
+                            <XCircle className="h-3.5 w-3.5" />
                           )}
+                          {activity.status}
                         </button>
                       </td>
-                      <td className="py-4 px-5 text-right">
-                        <div className="flex items-center justify-end gap-2">
+
+                      <td className="px-5 py-4 text-right">
+                        <div className="flex justify-end gap-2">
                           <button
-                            onClick={() => openEditModal(act)}
-                            className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-teal-400 border border-slate-700 transition-all"
-                            title="Edit Activity Type"
+                            type="button"
+                            onClick={() => openEditModal(activity)}
+                            className="rounded-lg border border-slate-700 bg-slate-800 p-2 text-teal-300 hover:bg-slate-700"
+                            title="Edit activity"
                           >
-                            <Edit3 className="w-4 h-4" />
+                            <Edit3 className="h-4 w-4" />
                           </button>
                           <button
-                            onClick={() => setDeletingActivity(act)}
-                            className="p-2 rounded-lg bg-slate-800 hover:bg-rose-900/60 text-rose-400 border border-slate-700 hover:border-rose-800/60 transition-all"
-                            title="Delete Activity Type"
+                            type="button"
+                            onClick={() => setDeletingActivity(activity)}
+                            className="rounded-lg border border-slate-700 bg-slate-800 p-2 text-rose-300 hover:bg-rose-950/50"
+                            title="Delete activity"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Trash2 className="h-4 w-4" />
                           </button>
                         </div>
                       </td>
@@ -483,267 +550,197 @@ const ActivityTypeManagementPage = () => {
             </div>
           )}
         </div>
+
+        <Pagination
+          page={page}
+          pageSize={pageSize}
+          total={filteredActivities.length}
+          onPageChange={setPage}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setPage(1);
+          }}
+        />
       </main>
 
-      {/* Add / Edit Activity Type Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-xl p-6 sm:p-8 shadow-2xl space-y-6 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-              <h2 className="text-xl font-bold text-white flex items-center gap-2.5">
-                <Activity className="w-5 h-5 text-emerald-400" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 p-4 backdrop-blur-sm">
+          <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl sm:p-8">
+            <div className="mb-6 flex items-center justify-between border-b border-slate-800 pb-4">
+              <h2 className="flex items-center gap-2 text-xl font-bold text-white">
+                <Activity className="h-5 w-5 text-emerald-400" />
                 {editingActivity ? 'Update Activity Type' : 'Add New Activity Type'}
               </h2>
-              <button
-                onClick={() => setIsModalOpen(false)}
-                className="text-slate-400 hover:text-white p-1"
-              >
-                ✕
-              </button>
+              <button type="button" onClick={resetModal} className="text-slate-400 hover:text-white">✕</button>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Category Dropdown */}
+            <form onSubmit={handleSubmit} className="space-y-5">
               <div>
-                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
-                  Category <span className="text-rose-400">*</span>
-                </label>
+                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-300">Category *</label>
                 <select
                   value={formData.categoryId}
-                  onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
-                  className={`w-full px-3.5 py-2.5 bg-slate-800 border rounded-xl text-sm text-white focus:outline-none ${
-                    formErrors.categoryId ? 'border-rose-500' : 'border-slate-700 focus:border-emerald-500'
-                  }`}
+                  onChange={(event) => setFormData({ ...formData, categoryId: event.target.value })}
+                  className="w-full rounded-xl border border-slate-700 bg-slate-800 px-3.5 py-2.5 text-sm text-white outline-none focus:border-emerald-500"
                 >
                   <option value="">-- Select Category --</option>
-                  {categories.map((cat) => (
-                    <option key={cat.categoryId} value={cat.categoryId}>
-                      {cat.categoryName} ({cat.categoryCode})
+                  {categories.map((category) => (
+                    <option key={category.categoryId} value={category.categoryId}>
+                      {category.categoryCode} · {category.categoryName}
                     </option>
                   ))}
                 </select>
-                {formErrors.categoryId && (
-                  <p className="text-rose-400 text-xs mt-1 flex items-center gap-1">
-                    <AlertCircle className="w-3.5 h-3.5" /> {formErrors.categoryId}
-                  </p>
-                )}
+                {formErrors.categoryId && <p className="mt-1 text-xs text-rose-400">{formErrors.categoryId}</p>}
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Activity Code */}
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
-                    Activity Code
-                  </label>
+                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-300">Activity Code</label>
                   <input
-                    type="text"
-                    placeholder="Auto-generated if blank (e.g. TRANS_CAR)"
                     value={formData.activityCode}
-                    onChange={(e) => setFormData({ ...formData, activityCode: e.target.value.toUpperCase() })}
-                    className={`w-full px-3.5 py-2.5 bg-slate-800 border rounded-xl text-sm font-mono text-emerald-400 placeholder-slate-500 focus:outline-none ${formErrors.activityCode ? 'border-rose-500' : 'border-slate-700 focus:border-emerald-500'}`}
+                    onChange={(event) => setFormData({ ...formData, activityCode: event.target.value.toUpperCase() })}
+                    placeholder="e.g. AGRI_FERTILIZER"
+                    className="w-full rounded-xl border border-slate-700 bg-slate-800 px-3.5 py-2.5 font-mono text-sm text-white outline-none focus:border-emerald-500"
                   />
-                  {formErrors.activityCode && (
-                    <p className="text-rose-400 text-xs mt-1 flex items-center gap-1">
-                      <AlertCircle className="w-3.5 h-3.5" /> {formErrors.activityCode}
-                    </p>
-                  )}
+                  {formErrors.activityCode && <p className="mt-1 text-xs text-rose-400">{formErrors.activityCode}</p>}
                 </div>
 
-                {/* Activity Name */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
-                    Activity Name <span className="text-rose-400">*</span>
-                  </label>
+                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-300">Activity Name *</label>
                   <input
-                    type="text"
-                    placeholder="e.g. Car, Bus, Veg Meal"
                     value={formData.activityName}
-                    onChange={(e) => setFormData({ ...formData, activityName: e.target.value })}
-                    className={`w-full px-3.5 py-2.5 bg-slate-800 border rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none ${
-                      formErrors.activityName ? 'border-rose-500' : 'border-slate-700 focus:border-emerald-500'
-                    }`}
+                    onChange={(event) => setFormData({ ...formData, activityName: event.target.value })}
+                    placeholder="e.g. Fertilizer Use"
+                    className="w-full rounded-xl border border-slate-700 bg-slate-800 px-3.5 py-2.5 text-sm text-white outline-none focus:border-emerald-500"
                   />
-                  {formErrors.activityName && (
-                    <p className="text-rose-400 text-xs mt-1 flex items-center gap-1">
-                      <AlertCircle className="w-3.5 h-3.5" /> {formErrors.activityName}
-                    </p>
-                  )}
+                  {formErrors.activityName && <p className="mt-1 text-xs text-rose-400">{formErrors.activityName}</p>}
                 </div>
               </div>
 
-              {/* Description */}
               <div>
-                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
-                  Description
-                </label>
+                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-300">Description</label>
                 <textarea
-                  rows="2"
-                  placeholder="Details about this activity..."
+                  rows={3}
                   value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="w-full px-3.5 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+                  onChange={(event) => setFormData({ ...formData, description: event.target.value })}
+                  className="w-full resize-none rounded-xl border border-slate-700 bg-slate-800 px-3.5 py-2.5 text-sm text-white outline-none focus:border-emerald-500"
                 />
               </div>
 
-              {/* Unit & Default Icon */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
-                    Unit of Measurement <span className="text-rose-400">*</span>
-                  </label>
+                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-300">Unit *</label>
                   <input
-                    type="text"
-                    placeholder="e.g. km, kWh, meals, items"
                     value={formData.unit}
-                    onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
-                    className={`w-full px-3.5 py-2.5 bg-slate-800 border rounded-xl text-sm text-teal-400 font-mono focus:outline-none ${
-                      formErrors.unit ? 'border-rose-500' : 'border-slate-700 focus:border-emerald-500'
-                    }`}
+                    onChange={(event) => setFormData({ ...formData, unit: event.target.value })}
+                    placeholder="e.g. kg, km, kWh"
+                    className="w-full rounded-xl border border-slate-700 bg-slate-800 px-3.5 py-2.5 text-sm text-white outline-none focus:border-emerald-500"
                   />
-                  <div className="flex flex-wrap gap-1.5 mt-2">
-                    {STANDARD_UNITS.map((u) => (
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {STANDARD_UNITS.map((unit) => (
                       <button
-                        key={u}
                         type="button"
-                        onClick={() => setFormData({ ...formData, unit: u })}
-                        className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-400 text-[10px] border border-slate-700"
+                        key={unit}
+                        onClick={() => setFormData({ ...formData, unit })}
+                        className="rounded border border-slate-700 bg-slate-800 px-2 py-0.5 text-[10px] text-slate-400 hover:bg-slate-700"
                       >
-                        {u}
+                        {unit}
                       </button>
                     ))}
                   </div>
-                  {formErrors.unit && (
-                    <p className="text-rose-400 text-xs mt-1 flex items-center gap-1">
-                      <AlertCircle className="w-3.5 h-3.5" /> {formErrors.unit}
-                    </p>
-                  )}
+                  {formErrors.unit && <p className="mt-1 text-xs text-rose-400">{formErrors.unit}</p>}
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
-                    Icon
-                  </label>
+                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-300">Icon</label>
                   <select
                     value={formData.icon}
-                    onChange={(e) => setFormData({ ...formData, icon: e.target.value })}
-                    className="w-full px-3.5 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-sm text-white focus:outline-none focus:border-emerald-500"
+                    onChange={(event) => setFormData({ ...formData, icon: event.target.value })}
+                    className="w-full rounded-xl border border-slate-700 bg-slate-800 px-3.5 py-2.5 text-sm text-white outline-none focus:border-emerald-500"
                   >
-                    {ICON_OPTIONS.map((item) => (
-                      <option key={item.name} value={item.name}>
-                        {item.name}
-                      </option>
-                    ))}
+                    {ICON_OPTIONS.map((item) => <option key={item.name} value={item.name}>{item.name}</option>)}
                   </select>
                 </div>
               </div>
 
-              {/* Quantities (Min, Max, Default) */}
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-300 uppercase tracking-wider mb-1">
-                    Min Quantity
-                  </label>
+                  <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-slate-300">Min Quantity</label>
                   <input
                     type="number"
                     step="any"
                     value={formData.minQuantity}
-                    onChange={(e) => setFormData({ ...formData, minQuantity: e.target.value })}
-                    className={`w-full px-3 py-2 bg-slate-800 border rounded-xl text-xs text-white focus:outline-none font-mono ${formErrors.minQuantity ? 'border-rose-500' : 'border-slate-700 focus:border-emerald-500'}`}
+                    onChange={(event) => setFormData({ ...formData, minQuantity: event.target.value })}
+                    className="w-full rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-sm font-mono text-white outline-none focus:border-emerald-500"
                   />
-                  {formErrors.minQuantity && <p className="mt-1 flex items-center gap-1 text-xs text-rose-400"><AlertCircle className="h-3.5 w-3.5" />{formErrors.minQuantity}</p>}
+                  {formErrors.minQuantity && <p className="mt-1 text-xs text-rose-400">{formErrors.minQuantity}</p>}
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-300 uppercase tracking-wider mb-1">
-                    Max Quantity
-                  </label>
+                  <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-slate-300">Max Quantity</label>
                   <input
                     type="number"
                     step="any"
                     value={formData.maxQuantity}
-                    onChange={(e) => setFormData({ ...formData, maxQuantity: e.target.value })}
-                    className={`w-full px-3 py-2 bg-slate-800 border rounded-xl text-xs text-white focus:outline-none font-mono ${formErrors.maxQuantity ? 'border-rose-500' : 'border-slate-700 focus:border-emerald-500'}`}
+                    onChange={(event) => setFormData({ ...formData, maxQuantity: event.target.value })}
+                    className="w-full rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-sm font-mono text-white outline-none focus:border-emerald-500"
                   />
-                  {formErrors.maxQuantity && <p className="mt-1 flex items-center gap-1 text-xs text-rose-400"><AlertCircle className="h-3.5 w-3.5" />{formErrors.maxQuantity}</p>}
+                  {formErrors.maxQuantity && <p className="mt-1 text-xs text-rose-400">{formErrors.maxQuantity}</p>}
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-300 uppercase tracking-wider mb-1">
-                    Default Quantity
-                  </label>
+                  <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-slate-300">Default Quantity</label>
                   <input
                     type="number"
                     step="any"
                     value={formData.defaultQuantity}
-                    onChange={(e) => setFormData({ ...formData, defaultQuantity: e.target.value })}
-                    className={`w-full px-3 py-2 bg-slate-800 border rounded-xl text-xs text-emerald-400 font-bold focus:outline-none font-mono ${formErrors.defaultQuantity ? 'border-rose-500' : 'border-slate-700 focus:border-emerald-500'}`}
+                    onChange={(event) => setFormData({ ...formData, defaultQuantity: event.target.value })}
+                    className="w-full rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-sm font-mono text-emerald-400 outline-none focus:border-emerald-500"
                   />
-                  {formErrors.defaultQuantity && <p className="mt-1 flex items-center gap-1 text-xs text-rose-400"><AlertCircle className="h-3.5 w-3.5" />{formErrors.defaultQuantity}</p>}
+                  {formErrors.defaultQuantity && <p className="mt-1 text-xs text-rose-400">{formErrors.defaultQuantity}</p>}
                 </div>
               </div>
 
-              {/* Order & Status */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
-                    Display Order
-                  </label>
+                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-300">Display Order</label>
                   <input
                     type="number"
                     min="1"
                     value={formData.displayOrder}
-                    onChange={(e) => setFormData({ ...formData, displayOrder: e.target.value })}
-                    className={`w-full px-3.5 py-2.5 bg-slate-800 border rounded-xl text-sm text-white focus:outline-none ${formErrors.displayOrder ? 'border-rose-500' : 'border-slate-700 focus:border-emerald-500'}`}
+                    onChange={(event) => setFormData({ ...formData, displayOrder: event.target.value })}
+                    className="w-full rounded-xl border border-slate-700 bg-slate-800 px-3.5 py-2.5 text-sm text-white outline-none focus:border-emerald-500"
                   />
-                  {formErrors.displayOrder && <p className="mt-1 flex items-center gap-1 text-xs text-rose-400"><AlertCircle className="h-3.5 w-3.5" />{formErrors.displayOrder}</p>}
+                  {formErrors.displayOrder && <p className="mt-1 text-xs text-rose-400">{formErrors.displayOrder}</p>}
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
-                    Status <span className="text-rose-400">*</span>
-                  </label>
+                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-300">Status *</label>
                   <select
                     value={formData.status}
-                    onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                    className={`w-full px-3.5 py-2.5 bg-slate-800 border rounded-xl text-sm text-white focus:outline-none ${formErrors.status ? 'border-rose-500' : 'border-slate-700 focus:border-emerald-500'}`}
+                    onChange={(event) => setFormData({ ...formData, status: event.target.value })}
+                    className="w-full rounded-xl border border-slate-700 bg-slate-800 px-3.5 py-2.5 text-sm text-white outline-none focus:border-emerald-500"
                   >
                     <option value="ACTIVE">ACTIVE</option>
                     <option value="INACTIVE">INACTIVE</option>
                   </select>
-                  {formErrors.status && <p className="mt-1 flex items-center gap-1 text-xs text-rose-400"><AlertCircle className="h-3.5 w-3.5" />{formErrors.status}</p>}
                 </div>
               </div>
 
-              {/* Remarks */}
               <div>
-                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
-                  Remarks
-                </label>
+                <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-300">Remarks</label>
                 <input
-                  type="text"
-                  placeholder="Optional internal remarks..."
                   value={formData.remarks}
-                  onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
-                  className="w-full px-3.5 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+                  onChange={(event) => setFormData({ ...formData, remarks: event.target.value })}
+                  placeholder="Optional internal remarks"
+                  className="w-full rounded-xl border border-slate-700 bg-slate-800 px-3.5 py-2.5 text-sm text-white outline-none focus:border-emerald-500"
                 />
               </div>
 
-              {/* Action buttons */}
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-sm transition-all"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-bold text-sm transition-all shadow-lg shadow-emerald-900/30"
-                >
-                  {submitting ? <RefreshCw className="w-4 h-4 animate-spin" /> : null}
-                  <span>{editingActivity ? 'Save Changes' : 'Create Activity Type'}</span>
+              <div className="flex justify-end gap-3 border-t border-slate-800 pt-4">
+                <button type="button" onClick={resetModal} className="rounded-xl bg-slate-800 px-4 py-2.5 text-sm font-semibold text-slate-300 hover:bg-slate-700">Cancel</button>
+                <button type="submit" disabled={submitting} className="flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-bold text-slate-950 hover:bg-emerald-500 disabled:opacity-60">
+                  {submitting && <RefreshCw className="h-4 w-4 animate-spin" />}
+                  {editingActivity ? 'Save Changes' : 'Create Activity Type'}
                 </button>
               </div>
             </form>
@@ -751,35 +748,23 @@ const ActivityTypeManagementPage = () => {
         </div>
       )}
 
-      {/* Delete Confirmation Modal */}
       {deletingActivity && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl">
             <div className="flex items-center gap-3 text-rose-400">
-              <AlertCircle className="w-7 h-7" />
+              <AlertCircle className="h-7 w-7" />
               <h3 className="text-lg font-bold text-white">Delete Activity Type</h3>
             </div>
-            <p className="text-sm text-slate-300">
-              Are you sure you want to delete activity type <strong className="text-white">"{deletingActivity.activityName}"</strong> ({deletingActivity.activityCode}) under <strong className="text-emerald-400">{deletingActivity.categoryName}</strong>? This action cannot be undone.
+            <p className="mt-4 text-sm text-slate-300">
+              Are you sure you want to delete <strong className="text-white">{deletingActivity.activityName}</strong>?
             </p>
-            <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
-              <button
-                onClick={() => setDeletingActivity(null)}
-                className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-semibold transition-all"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleDelete}
-                className="px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-sm font-bold transition-all shadow-lg shadow-rose-900/30"
-              >
-                Confirm Delete
-              </button>
+            <div className="mt-6 flex justify-end gap-3 border-t border-slate-800 pt-4">
+              <button type="button" onClick={() => setDeletingActivity(null)} className="rounded-xl bg-slate-800 px-4 py-2.5 text-sm font-semibold text-slate-300 hover:bg-slate-700">Cancel</button>
+              <button type="button" onClick={deleteActivity} className="rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-rose-500">Confirm Delete</button>
             </div>
           </div>
         </div>
       )}
-
     </div>
   );
 };

@@ -109,10 +109,33 @@ Password: admin123
 ```properties
 spring.datasource.url=jdbc:postgresql://localhost:5432/carbonfootprint
 spring.datasource.username=postgres
-spring.datasource.password=post@123
+spring.datasource.password=your_postgres_password
 ```
 
 ---
 
 ## Author
 Infosys Spring 2026 Internship Batch
+
+## Latest Dataset & Pagination Update (August 2026)
+
+The latest implementation seeds realistic database records through `DataInitializer` and uses Spring Data/JPA server-side pagination for record lists.
+
+### Seeded demonstration data
+- 10 approved demo users
+- 4 categories
+- 15 activity types
+- 15 emission factors
+- 4 active monthly emission limits
+- 40+ activity logs overall and 15+ for `demo.user`
+- 12 monthly goals for `demo.user` plus goals for other demo users
+- 12 monthly alerts for `demo.user` plus additional alert records as needed
+- 12 published sustainability articles
+
+### Pagination
+Supported page sizes are 5, 10, 15, 20 and 50. Page requests are sent to backend endpoints using Spring Data `Pageable`, and the UI displays total records, page numbers, previous/next navigation and page-size selection.
+
+### Demo account
+Username: `demo.user`  
+Email: `demo@ecotrack.local`  
+Password: `demo123`

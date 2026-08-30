@@ -10,6 +10,9 @@ import {
   Wind, Plane, Bike, Bus, Train, Trash, Home, Globe, Activity, Grid2X2, List, Target,
   Upload, ImageIcon
 } from 'lucide-react';
+import { formatCreatedAt } from '../utils/dateTime';
+import Pagination from '../components/Pagination';
+import { paginate } from '../utils/clientPagination';
 
 const ICON_OPTIONS = [
   { name: 'Car', icon: Car },
@@ -148,8 +151,11 @@ function ImagePicker({ existingUrl, onFileChange, imageError, setImageError }) {
 }
 
 const CategoryManagementPage = () => {
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(5);
   const { showToast } = useAuth();
   const [categories, setCategories] = useState([]);
+  const [totalRecords, setTotalRecords] = useState(0);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
@@ -180,9 +186,11 @@ const CategoryManagementPage = () => {
     setLoading(true);
     try {
       const res = await api.get('/admin/categories');
-      setCategories(res.data || []);
+      const data = Array.isArray(res?.data) ? res.data : [];
+      setCategories(data);
     } catch (err) {
-      showToast('Failed to load categories: ' + (err.toString() || 'Server error'), 'error');
+      setCategories([]);
+      showToast('Failed to load categories: ' + (err?.message || err?.toString() || 'Server error'), 'error');
     } finally {
       setLoading(false);
     }
@@ -191,6 +199,8 @@ const CategoryManagementPage = () => {
   useEffect(() => {
     fetchCategories();
   }, []);
+
+  useEffect(() => { setPage(1); }, [searchQuery, statusFilter]);
 
   const openAddModal = () => {
     setEditingCategory(null);
@@ -327,17 +337,23 @@ const CategoryManagementPage = () => {
     }
   };
 
-  const filteredCategories = categories.filter((c) => {
+  const filteredCategories = (Array.isArray(categories) ? categories : []).filter((c) => {
+    const categoryName = String(c?.categoryName || '');
+    const categoryCode = String(c?.categoryCode || '');
+    const description = String(c?.description || '');
     const matchesSearch = 
-      c.categoryName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.categoryCode.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.description.toLowerCase().includes(searchQuery.toLowerCase());
+      categoryName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      categoryCode.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      description.toLowerCase().includes(searchQuery.toLowerCase());
     
     const matchesStatus = 
       statusFilter === 'ALL' || c.status === statusFilter;
 
     return matchesSearch && matchesStatus;
   });
+
+  const safePage = Math.max(1, page);
+  const paginatedCategories = paginate(filteredCategories, safePage, pageSize);
 
   const renderIcon = (iconName, color = '#10B981') => {
     const iconObj = ICON_OPTIONS.find((item) => item.name === iconName);
@@ -457,10 +473,19 @@ const CategoryManagementPage = () => {
             </div>
           ) : viewMode === 'cards' ? (
             <div className="grid grid-cols-1 gap-4 p-4 md:grid-cols-2 xl:grid-cols-3">
-              {filteredCategories.map((cat) => (
+              {paginatedCategories.map((cat) => (
                 <article key={cat.categoryId} className="group relative overflow-hidden rounded-2xl border border-slate-700 bg-slate-900/70 transition hover:-translate-y-0.5 hover:border-emerald-500/50 hover:shadow-xl hover:shadow-emerald-950/20">
                   <div className="relative h-36 overflow-hidden">
-                    <img src={cat.image || getCategoryImage(cat)} alt={`${cat.categoryName} sustainability`} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
+                    <img
+                      src={getCategoryImage(cat)}
+                      alt={`${cat.categoryName || 'Category'} sustainability`}
+                      className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                      onError={(e) => {
+                        // Never leave a broken image icon in the category dashboard.
+                        e.currentTarget.onerror = null;
+                        e.currentTarget.src = '/category-images/water.svg';
+                      }}
+                    />
                     <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/25 to-slate-950/10" />
                     <span className="absolute bottom-3 left-4 h-8 w-1 rounded-r" style={{ backgroundColor: cat.colorCode || '#10B981' }} />
                   </div>
@@ -473,7 +498,7 @@ const CategoryManagementPage = () => {
                         <span className="text-emerald-300 font-semibold">{cat.monthlyLimit} kg CO₂e/month</span>
                       </div>
                     )}
-                    <div className="mt-4 flex items-center justify-between border-t border-slate-800 pt-4"><span className="text-xs text-slate-500">Display order <b className="text-slate-300">{cat.displayOrder ?? '-'}</b></span><div className="flex gap-2"><button onClick={() => openEditModal(cat)} className="rounded-lg bg-slate-800 p-2 text-teal-300 hover:bg-slate-700" title="Edit category"><Edit3 className="h-4 w-4" /></button><button onClick={() => handleToggleStatus(cat)} className="rounded-lg bg-slate-800 p-2 text-emerald-300 hover:bg-slate-700" title="Change status">{cat.status === 'ACTIVE' ? <ToggleRight className="h-4 w-4" /> : <ToggleLeft className="h-4 w-4" />}</button><button onClick={() => setDeletingCategory(cat)} className="rounded-lg bg-slate-800 p-2 text-rose-300 hover:bg-rose-950" title="Delete category"><Trash2 className="h-4 w-4" /></button></div></div>
+                    <div className="mt-4 flex items-center justify-between border-t border-slate-800 pt-4"><div className="space-y-0.5"><span className="block text-xs text-slate-500">Created <b className="text-slate-300">{formatCreatedAt(cat.createdAt)}</b></span><span className="text-xs text-slate-500">Display order <b className="text-slate-300">{cat.displayOrder ?? '-'}</b></span></div><div className="flex gap-2"><button onClick={() => openEditModal(cat)} className="rounded-lg bg-slate-800 p-2 text-teal-300 hover:bg-slate-700" title="Edit category"><Edit3 className="h-4 w-4" /></button><button onClick={() => handleToggleStatus(cat)} className="rounded-lg bg-slate-800 p-2 text-emerald-300 hover:bg-slate-700" title="Change status">{cat.status === 'ACTIVE' ? <ToggleRight className="h-4 w-4" /> : <ToggleLeft className="h-4 w-4" />}</button><button onClick={() => setDeletingCategory(cat)} className="rounded-lg bg-slate-800 p-2 text-rose-300 hover:bg-rose-950" title="Delete category"><Trash2 className="h-4 w-4" /></button></div></div>
                   </div>
                 </article>
               ))}
@@ -489,11 +514,12 @@ const CategoryManagementPage = () => {
                     <th className="py-4 px-5 text-right">Monthly Limit</th>
                     <th className="py-4 px-5 text-center">Order</th>
                     <th className="py-4 px-5 text-center">Status</th>
+                    <th className="py-4 px-5">Created At</th>
                     <th className="py-4 px-5 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800">
-                  {filteredCategories.map((cat) => (
+                  {paginatedCategories.map((cat) => (
                     <tr key={cat.categoryId} className="hover:bg-slate-800/40 transition-colors">
                       <td className="py-4 px-5">
                         <span className="font-mono text-xs px-2.5 py-1 rounded-md bg-slate-900 text-emerald-400 border border-slate-700 font-bold">
@@ -548,6 +574,7 @@ const CategoryManagementPage = () => {
                           )}
                         </button>
                       </td>
+                      <td className="py-4 px-5 text-xs text-slate-400 whitespace-nowrap">{formatCreatedAt(cat.createdAt)}</td>
                       <td className="py-4 px-5 text-right">
                         <div className="flex items-center justify-end gap-2">
                           <button
@@ -573,6 +600,7 @@ const CategoryManagementPage = () => {
             </div>
           )}
         </div>
+      <Pagination page={safePage} pageSize={pageSize} total={filteredCategories.length} onPageChange={setPage} onPageSizeChange={n => { setPageSize(n); setPage(1); }} />
       </main>
 
       {/* Add / Edit Category Modal */}

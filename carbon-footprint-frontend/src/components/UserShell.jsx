@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { BarChart3, Bell, BookOpen, ClipboardPlus, History, Leaf, Lightbulb, LogOut, Menu, Target, UserRound, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import PageErrorBoundary from './PageErrorBoundary';
 import api from '../api/axios';
 
 const navItems = [
@@ -75,7 +76,7 @@ export default function UserShell() {
           <button onClick={() => setOpen(true)} className="rounded-lg p-2 hover:bg-slate-800"><Menu /></button>
           <span className="font-bold">EcoTrack</span>
         </header>
-        <Outlet />
+        <PageErrorBoundary><Outlet /></PageErrorBoundary>
       </div>
 
       {open && (

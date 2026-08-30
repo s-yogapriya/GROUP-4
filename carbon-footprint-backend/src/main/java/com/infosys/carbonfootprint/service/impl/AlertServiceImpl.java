@@ -9,6 +9,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.util.*;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 @Service
 public class AlertServiceImpl implements AlertService {
@@ -34,6 +36,9 @@ public class AlertServiceImpl implements AlertService {
         return repo.findByUserIdAndAlertTypeAndMonthAndYearAndCategoryIsNullOrderByCreatedAtDesc(userId, AlertType.GOAL_EXCEEDED, now.getMonthValue(), now.getYear())
                 .stream().filter(alert -> !alert.isResolved()).findFirst().map(this::dto);
     }
+
+    @Transactional(readOnly = true)
+    public Page<AlertDto> getPage(Long userId, Pageable pageable) { return repo.findByUserId(userId, pageable).map(this::dto); }
 
     @Transactional(readOnly = true)
     public long unreadCount(Long userId) {

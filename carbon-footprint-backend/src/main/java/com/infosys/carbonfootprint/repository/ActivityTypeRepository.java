@@ -15,4 +15,5 @@ public interface ActivityTypeRepository extends JpaRepository<ActivityType, Long
     boolean existsByActivityCodeIgnoreCaseAndActivityTypeIdNot(String code, Long id);
     List<ActivityType> findAllByOrderByDisplayOrderAscActivityNameAsc();
     List<ActivityType> findByStatus(CategoryStatus status);
+    java.util.Optional<ActivityType> findByActivityCode(String activityCode);
 }

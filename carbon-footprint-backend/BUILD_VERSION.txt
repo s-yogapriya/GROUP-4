@@ -1,0 +1,1 @@
+EcoTrack compatibility patch: emission_limits.status mapped, seeded, backfilled; category limit updates reuse existing row.

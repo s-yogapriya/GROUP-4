@@ -14,6 +14,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import java.util.stream.Collectors;
 import java.util.Locale;
 
@@ -61,6 +63,12 @@ public class ActivityTypeServiceImpl implements ActivityTypeService {
     public List<ActivityTypeDto> getAll() {
         return activityTypeRepository.findAllByOrderByDisplayOrderAscActivityNameAsc()
                 .stream().map(this::toDto).collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<ActivityTypeDto> getPage(Pageable pageable) {
+        return activityTypeRepository.findAll(pageable).map(this::toDto);
     }
 
     @Override
@@ -161,6 +169,7 @@ public class ActivityTypeServiceImpl implements ActivityTypeService {
         return ActivityTypeDto.builder()
                 .activityTypeId(at.getActivityTypeId())
                 .categoryId(at.getCategory().getCategoryId())
+                .categoryCode(at.getCategory().getCategoryCode())
                 .categoryName(at.getCategory().getCategoryName())
                 .activityCode(at.getActivityCode())
                 .activityName(at.getActivityName())

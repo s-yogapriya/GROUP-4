@@ -21,6 +21,8 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.List;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -74,6 +76,7 @@ public class CategoryServiceImpl implements CategoryService {
                     .category(saved)
                     .monthlyLimit(dto.getMonthlyLimit())
                     .unit("kg CO2e")
+                    .status("ACTIVE")
                     .active(true)
                     .build();
             emissionLimitRepository.save(limit);
@@ -87,6 +90,12 @@ public class CategoryServiceImpl implements CategoryService {
     public List<CategoryDto> getAll() {
         return categoryRepository.findAllByOrderByDisplayOrderAscCategoryNameAsc()
                 .stream().map(this::toDto).collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<CategoryDto> getPage(Pageable pageable) {
+        return categoryRepository.findAll(pageable).map(this::toDto);
     }
 
     @Override
@@ -122,7 +131,7 @@ public class CategoryServiceImpl implements CategoryService {
         Category saved = categoryRepository.save(category);
 
         if (dto.getMonthlyLimit() != null) {
-            EmissionLimit existingLimit = emissionLimitRepository.findByCategoryCategoryIdAndActiveTrue(id).orElse(null);
+            EmissionLimit existingLimit = emissionLimitRepository.findByCategoryCategoryId(id).orElse(null);
             if (dto.getMonthlyLimit() > 0) {
                 if (existingLimit != null) {
                     existingLimit.setMonthlyLimit(dto.getMonthlyLimit());
@@ -132,12 +141,14 @@ public class CategoryServiceImpl implements CategoryService {
                             .category(saved)
                             .monthlyLimit(dto.getMonthlyLimit())
                             .unit("kg CO2e")
+                            .status("ACTIVE")
                             .active(true)
                             .build();
                     emissionLimitRepository.save(limit);
                 }
             } else if (existingLimit != null) {
                 existingLimit.setActive(false);
+                existingLimit.setStatus("INACTIVE");
                 emissionLimitRepository.save(existingLimit);
             }
         }

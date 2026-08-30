@@ -1,6 +1,7 @@
 package com.infosys.carbonfootprint.controller;
 
 import com.infosys.carbonfootprint.dto.EmissionFactorDto;
+import com.infosys.carbonfootprint.entity.CategoryStatus;
 import com.infosys.carbonfootprint.response.ApiResponse;
 import com.infosys.carbonfootprint.security.UserDetailsImpl;
 import com.infosys.carbonfootprint.service.EmissionFactorService;
@@ -13,6 +14,10 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 
 @RestController
 @RequestMapping("/api/v1/admin/emission-factors")
@@ -38,6 +43,21 @@ public class EmissionFactorController {
     public ResponseEntity<ApiResponse<List<EmissionFactorDto>>> getByActivityType(@PathVariable Long activityTypeId) {
         return ResponseEntity.ok(ApiResponse.success("Emission factors fetched",
                 emissionFactorService.getByActivityType(activityTypeId)));
+    }
+
+    @GetMapping("/page")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<Page<EmissionFactorDto>>> getPage(
+            @RequestParam(defaultValue="0") int page,
+            @RequestParam(defaultValue="5") int size,
+            @RequestParam(required=false) Long activityTypeId,
+            @RequestParam(required=false) Long categoryId,
+            @RequestParam(required=false) CategoryStatus status,
+            @RequestParam(required=false) String search) {
+        int safeSize = List.of(5,10,15,20,50).contains(size) ? size : 5;
+        Pageable pageable = PageRequest.of(Math.max(0,page), safeSize, Sort.by("createdAt").descending());
+        return ResponseEntity.ok(ApiResponse.success("Emission factors page fetched",
+                emissionFactorService.getFilteredPage(activityTypeId, categoryId, status, search, pageable)));
     }
 
     @GetMapping("/{id}")
