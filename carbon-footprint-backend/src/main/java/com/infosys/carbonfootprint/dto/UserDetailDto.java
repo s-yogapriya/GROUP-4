@@ -28,6 +28,7 @@ public class UserDetailDto {
     private String alternateMobile;
     private UserStatus status;
     private boolean firstLogin;
+    private String profilePhotoUrl;
     private AddressDto address;
     private GovernmentIdDto governmentId;
     private List<String> roles;

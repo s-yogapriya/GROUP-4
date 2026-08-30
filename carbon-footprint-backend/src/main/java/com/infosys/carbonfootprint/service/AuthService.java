@@ -8,6 +8,8 @@ public interface AuthService {
 
     JwtResponse authenticateUser(UserLoginRequest request);
 
+    JwtResponse authenticateGoogle(GoogleLoginRequest request);
+
     UserDetailDto registerUser(RegistrationRequest request);
 
     void resetPassword(Long userId, PasswordResetRequest request);

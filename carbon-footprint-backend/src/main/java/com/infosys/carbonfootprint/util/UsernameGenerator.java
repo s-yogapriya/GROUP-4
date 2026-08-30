@@ -15,10 +15,11 @@ public class UsernameGenerator {
     private final Random random = new Random();
 
     public String generateUniqueUsername(String firstName, String lastName) {
-        String cleanFirst = firstName.replaceAll("[^a-zA-Z]", "").toLowerCase();
-        String cleanLast = lastName.replaceAll("[^a-zA-Z]", "").toLowerCase();
+        String cleanFirst = (firstName != null ? firstName : "user").replaceAll("[^a-zA-Z]", "").toLowerCase();
+        String cleanLast = (lastName != null ? lastName : "").replaceAll("[^a-zA-Z]", "").toLowerCase();
+        if (cleanFirst.isBlank()) cleanFirst = "user";
 
-        String base = cleanFirst + "." + cleanLast;
+        String base = cleanLast.isBlank() ? cleanFirst : cleanFirst + "." + cleanLast;
         String candidate = base;
 
         int attempts = 0;

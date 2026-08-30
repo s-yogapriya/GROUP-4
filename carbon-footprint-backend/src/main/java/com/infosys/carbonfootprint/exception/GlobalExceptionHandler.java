@@ -56,6 +56,36 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(ApiResponse.error("Invalid username/email or password"), HttpStatus.UNAUTHORIZED);
     }
 
+    @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
+    public ResponseEntity<ApiResponse<String>> handleAccessDeniedException(org.springframework.security.access.AccessDeniedException ex) {
+        return new ResponseEntity<>(ApiResponse.error("Access Denied: You do not have permission to access this resource"), HttpStatus.FORBIDDEN);
+    }
+
+    @ExceptionHandler(org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiResponse<String>> handleTypeMismatchException(org.springframework.web.method.annotation.MethodArgumentTypeMismatchException ex) {
+        return new ResponseEntity<>(ApiResponse.error("Invalid value provided for parameter: " + ex.getName()), HttpStatus.BAD_REQUEST);
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ApiResponse<String>> handleIllegalArgumentException(IllegalArgumentException ex) {
+        return new ResponseEntity<>(ApiResponse.error(ex.getMessage()), HttpStatus.BAD_REQUEST);
+    }
+
+    @ExceptionHandler(org.springframework.http.converter.HttpMessageNotReadableException.class)
+    public ResponseEntity<ApiResponse<String>> handleHttpMessageNotReadableException(org.springframework.http.converter.HttpMessageNotReadableException ex) {
+        return new ResponseEntity<>(ApiResponse.error("Malformed or missing JSON request body"), HttpStatus.BAD_REQUEST);
+    }
+
+    @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
+    public ResponseEntity<ApiResponse<String>> handleMaxUploadSizeExceededException(org.springframework.web.multipart.MaxUploadSizeExceededException ex) {
+        return new ResponseEntity<>(ApiResponse.error("File size exceeds the maximum upload limit of 10 MB"), HttpStatus.BAD_REQUEST);
+    }
+
+    @ExceptionHandler(org.springframework.web.multipart.MultipartException.class)
+    public ResponseEntity<ApiResponse<String>> handleMultipartException(org.springframework.web.multipart.MultipartException ex) {
+        return new ResponseEntity<>(ApiResponse.error("Request is not a valid multipart request"), HttpStatus.BAD_REQUEST);
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<String>> handleGlobalException(Exception ex) {
         return new ResponseEntity<>(
@@ -64,3 +94,5 @@ public class GlobalExceptionHandler {
         );
     }
 }
+
+

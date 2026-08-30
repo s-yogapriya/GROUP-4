@@ -6,6 +6,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
@@ -19,6 +20,9 @@ public class EmailServiceImpl implements EmailService {
 
     @Autowired(required = false)
     private JavaMailSender mailSender;
+
+    @Value("${spring.mail.username}")
+    private String fromEmail;
 
     @Override
     @Async
@@ -59,6 +63,7 @@ public class EmailServiceImpl implements EmailService {
         if (mailSender != null) {
             try {
                 SimpleMailMessage message = new SimpleMailMessage();
+                message.setFrom(fromEmail);
                 message.setTo(toEmail);
                 message.setSubject(subject);
                 message.setText(body);
@@ -95,6 +100,7 @@ public class EmailServiceImpl implements EmailService {
         if (mailSender != null) {
             try {
                 SimpleMailMessage message = new SimpleMailMessage();
+                message.setFrom(fromEmail);
                 message.setTo(toEmail);
                 message.setSubject(subject);
                 message.setText(body);

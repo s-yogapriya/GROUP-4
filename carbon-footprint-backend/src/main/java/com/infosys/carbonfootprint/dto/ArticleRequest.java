@@ -1,0 +1,3 @@
+package com.infosys.carbonfootprint.dto;
+import com.infosys.carbonfootprint.entity.ArticleStatus; import jakarta.validation.constraints.*; import lombok.*;
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor public class ArticleRequest { @NotBlank @Size(max=200) private String title; @NotBlank @Size(max=600) private String shortDescription; @NotBlank private String content; @NotBlank @Size(max=100) private String category; private String coverImage; private ArticleStatus status; private Boolean visibleToUsers; }

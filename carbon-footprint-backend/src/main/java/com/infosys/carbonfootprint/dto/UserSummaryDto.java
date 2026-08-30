@@ -22,5 +22,6 @@ public class UserSummaryDto {
     private Gender gender;
     private UserStatus status;
     private boolean firstLogin;
+    private String profilePhotoUrl;
     private LocalDateTime createdAt;
 }

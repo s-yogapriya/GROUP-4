@@ -1,0 +1,3 @@
+package com.infosys.carbonfootprint.service;
+import com.infosys.carbonfootprint.dto.*; import org.springframework.web.multipart.MultipartFile; import java.util.*; import org.springframework.data.domain.Page; import org.springframework.data.domain.Pageable;
+public interface ArticleService { List<ArticleDto> userArticles(); Page<ArticleDto> userArticlesPage(Pageable pageable); ArticleDto userArticle(Long id); List<ArticleDto> adminArticles(); Page<ArticleDto> adminArticlesPage(Pageable pageable); ArticleDto save(ArticleRequest request,String author,Long id); ArticleDto saveWithImage(ArticleRequest request, MultipartFile image, String author, Long id); void delete(Long id); ArticleDto publish(Long id); ArticleDto unpublish(Long id); }

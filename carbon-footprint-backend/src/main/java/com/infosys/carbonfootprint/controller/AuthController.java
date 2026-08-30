@@ -10,7 +10,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 /**
- * Controller handling public Auth REST endpoints (Registration, Admin Login, User Login, Password Reset).
+ * Controller handling public Auth REST endpoints (Registration, Admin Login, User Login, Password Reset, Google Login).
  */
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -29,6 +29,12 @@ public class AuthController {
     public ResponseEntity<ApiResponse<JwtResponse>> loginUser(@Valid @RequestBody UserLoginRequest loginRequest) {
         JwtResponse response = authService.authenticateUser(loginRequest);
         return ResponseEntity.ok(ApiResponse.success("User authenticated successfully", response));
+    }
+
+    @PostMapping("/google")
+    public ResponseEntity<ApiResponse<JwtResponse>> loginWithGoogle(@Valid @RequestBody GoogleLoginRequest googleRequest) {
+        JwtResponse response = authService.authenticateGoogle(googleRequest);
+        return ResponseEntity.ok(ApiResponse.success("Google authentication successful", response));
     }
 
     @PostMapping("/register")

@@ -18,6 +18,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import java.util.stream.Collectors;
 
 @Service
@@ -87,6 +89,18 @@ public class AdminServiceImpl implements AdminService {
 
     @Override
     @Transactional(readOnly = true)
+    public Page<UserSummaryDto> getAllUsersPage(Pageable pageable) {
+        return userRepository.findAllRegisteredUsers(pageable).map(userMapper::toSummaryDto);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<UserSummaryDto> getUsersByStatusPage(UserStatus status, Pageable pageable) {
+        return userRepository.findRegisteredUsersByStatus(status, pageable).map(userMapper::toSummaryDto);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public UserDetailDto getUserById(Long id) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", id));
@@ -133,12 +147,19 @@ public class AdminServiceImpl implements AdminService {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", id));
 
+        if (user.getStatus() == UserStatus.REJECTED) {
+            throw new ValidationException("User is already REJECTED");
+        }
+
         user.setStatus(UserStatus.REJECTED);
         User savedUser = userRepository.save(user);
 
-        String fullName = user.getFirstName() + " " + user.getLastName();
+        String first = user.getFirstName() != null ? user.getFirstName() : "";
+        String last = user.getLastName() != null ? user.getLastName() : "";
+        String fullName = (first + " " + last).trim();
         emailService.sendRejectionEmail(user.getEmail(), fullName, remark);
 
         return userMapper.toDetailDto(savedUser);
     }
 }
+

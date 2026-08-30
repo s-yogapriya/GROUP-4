@@ -1,0 +1,3 @@
+package com.infosys.carbonfootprint.dto;
+import com.infosys.carbonfootprint.entity.*; import lombok.*; import java.time.*;
+@Getter @Setter @Builder @NoArgsConstructor @AllArgsConstructor public class AlertDto { private Long id; private String categoryName; private AlertType alertType; private AlertSeverity severity; private String title; private String message; private String recommendation; private Double currentEmission; private Double monthlyLimit; private Double exceededAmount; private boolean read; private boolean resolved; private Integer month; private Integer year; private LocalDateTime createdAt; }

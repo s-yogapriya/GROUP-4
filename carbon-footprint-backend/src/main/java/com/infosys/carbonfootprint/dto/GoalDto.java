@@ -1,0 +1,3 @@
+package com.infosys.carbonfootprint.dto;
+import lombok.*; import java.time.*;
+@Getter @Setter @Builder @NoArgsConstructor @AllArgsConstructor public class GoalDto { private Long id; private Double targetAmount; private Double currentEmission; private Double remaining; private Double percentageUsed; private String status; private Integer month; private Integer year; private LocalDateTime createdAt; private LocalDateTime updatedAt; }

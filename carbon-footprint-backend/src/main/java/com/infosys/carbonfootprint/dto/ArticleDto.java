@@ -1,0 +1,3 @@
+package com.infosys.carbonfootprint.dto;
+import com.infosys.carbonfootprint.entity.ArticleStatus; import lombok.*; import java.time.*;
+@Getter @Setter @Builder @NoArgsConstructor @AllArgsConstructor public class ArticleDto { private Long id; private String title; private String shortDescription; private String content; private String category; private String coverImage; private String author; private ArticleStatus status; private boolean visibleToUsers; private LocalDateTime publishedAt; private LocalDateTime createdAt; private LocalDateTime updatedAt; }

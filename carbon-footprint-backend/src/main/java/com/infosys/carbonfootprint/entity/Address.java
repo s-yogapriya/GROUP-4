@@ -2,6 +2,9 @@ package com.infosys.carbonfootprint.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+
+import java.time.LocalDateTime;
 
 /**
  * Address Entity normalized to 3NF.
@@ -19,26 +22,25 @@ public class Address {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "house_number", nullable = false)
+    @CreationTimestamp
+    @Column(name = "created_at", updatable = false)
+    private LocalDateTime createdAt;
+
+    @Column(name = "house_number")
     private String houseNumber;
 
-    @Column(nullable = false)
     private String street;
 
-    @Column(nullable = false)
     private String area;
 
     private String landmark;
 
-    @Column(nullable = false)
     private String city;
 
-    @Column(nullable = false)
     private String state;
 
-    @Column(nullable = false)
     private String country;
 
-    @Column(name = "pin_code", nullable = false, length = 10)
+    @Column(name = "pin_code", length = 10)
     private String pinCode;
 }

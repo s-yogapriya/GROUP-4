@@ -1,0 +1,3 @@
+package com.infosys.carbonfootprint.repository;
+import com.infosys.carbonfootprint.entity.*; import org.springframework.data.jpa.repository.JpaRepository; import org.springframework.data.domain.Page; import org.springframework.data.domain.Pageable; import java.util.*;
+public interface GoalRepository extends JpaRepository<Goal,Long> { Optional<Goal> findByUserIdAndMonthAndYear(Long userId,Integer month,Integer year); List<Goal> findByUserIdOrderByYearDescMonthDesc(Long userId); Page<Goal> findByUserId(Long userId, Pageable pageable); }

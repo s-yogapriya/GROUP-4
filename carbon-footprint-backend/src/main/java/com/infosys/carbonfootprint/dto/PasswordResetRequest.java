@@ -11,7 +11,6 @@ import lombok.*;
 @Builder
 public class PasswordResetRequest {
 
-    @NotBlank(message = "Temporary or current password is required")
     private String oldPassword;
 
     @NotBlank(message = "New password is required")
